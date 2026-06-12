@@ -1,0 +1,179 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block page_title %}
+Mes réservations
+{% endblock %}
+
+{% block content %}
+
+<style>
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .header h2 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .btn-add {
+        background: #2563eb;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-size: 14px;
+    }
+
+    .btn-add:hover {
+        background: #1d4ed8;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+    }
+
+    .card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+
+    .title {
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 5px;
+    }
+
+    .muted {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .row {
+        margin-top: 10px;
+        font-size: 14px;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    .attente {
+        background: #fff7ed;
+        color: #c2410c;
+    }
+
+    .confirmee {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    .refusee {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .actions {
+        margin-top: 12px;
+    }
+
+    .actions a {
+        font-size: 13px;
+        color: #2563eb;
+        text-decoration: none;
+        margin-right: 10px;
+    }
+
+    .actions a:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="header">
+
+    <div>
+        <h2>Mes réservations</h2>
+        <p class="muted">Suivi de vos demandes de salles</p>
+    </div>
+
+    <a href="{% url 'reservation_create' %}" class="btn-add">
+        + Nouvelle réservation
+    </a>
+
+</div>
+
+
+<div class="grid">
+
+    {% for r in reservations %}
+
+        <div class="card">
+
+            <div class="title">
+                {{ r.salle.nom }}
+            </div>
+
+            <div class="muted">
+                {{ r.date_reunion }} • {{ r.heure_debut }} - {{ r.heure_fin }}
+            </div>
+
+            <div class="row">
+                <strong>Statut :</strong>
+
+                {% if r.statut == "EN_ATTENTE" %}
+                    <span class="badge attente">En attente</span>
+
+                {% elif r.statut == "CONFIRMEE" %}
+                    <span class="badge confirmee">Confirmée</span>
+
+                {% elif r.statut == "REFUSEE" %}
+                    <span class="badge refusee">Refusée</span>
+
+                {% elif r.statut == "ANNULEE" %}
+                    <span class="badge refusee">Annulée</span>
+
+                {% else %}
+                    <span class="badge">{{ r.statut }}</span>
+                {% endif %}
+            </div>
+
+            {% if r.precisions %}
+                <div class="row muted">
+                    {{ r.precisions }}
+                </div>
+            {% endif %}
+
+            <div class="actions">
+
+                <a href="#">Voir</a>
+
+                {% if r.statut == "EN_ATTENTE" %}
+                    <a href="#">Modifier</a>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    {% empty %}
+
+        <p>Aucune réservation pour le moment.</p>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

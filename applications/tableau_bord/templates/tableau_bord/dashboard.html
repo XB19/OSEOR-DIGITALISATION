@@ -1,0 +1,197 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<style>
+    :root {
+        --primary: #2563eb;
+        --danger: #dc2626;
+        --success: #16a34a;
+        --warning: #f59e0b;
+        --bg-card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --border: #e5e7eb;
+        --shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+    }
+
+    .page-title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+        position: relative;
+        transition: 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow);
+    }
+
+    .stat-label {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 800;
+    }
+
+    .stat-sub {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 6px;
+    }
+
+    .badge {
+        display: inline-flex;
+        margin-top: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .blue { background:#eff6ff; color:var(--primary); }
+    .green { background:#ecfdf5; color:var(--success); }
+    .red { background:#fef2f2; color:var(--danger); }
+    .orange { background:#fff7ed; color:var(--warning); }
+
+    .section-title {
+        margin-top: 30px;
+        margin-bottom: 10px;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+    }
+
+</style>
+
+<div class="page-title">
+    Tableau de bord
+</div>
+
+{# ================= ADMINISTRATEUR ================= #}
+
+{% if user.role == "ADMINISTRATEUR" %}
+
+    <div class="section-title">Vue globale du groupe</div>
+
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <div class="stat-label">Utilisateurs total</div>
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-sub">Comptes actifs dans le système</div>
+            <div class="badge blue">Système global</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Filiales</div>
+            <div class="stat-value">{{ total_filiales }}</div>
+            <div class="stat-sub">Entités du groupe OSEOR</div>
+            <div class="badge green">Structure groupe</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Salles</div>
+            <div class="stat-value">{{ total_salles }}</div>
+            <div class="stat-sub">Toutes filiales confondues</div>
+            <div class="badge blue">Ressources</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Réservations en attente</div>
+            <div class="stat-value">{{ reservations_attente }}</div>
+            <div class="stat-sub">Demandes à valider</div>
+            <div class="badge orange">Workflow</div>
+        </div>
+
+    </div>
+
+{% endif %}
+
+{# ================= GERANT ================= #}
+
+{% if user.role == "CHEF_SERVICE" %}
+
+<div class="section-title">Gestion de votre filiale</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-label">Mes salles</div>
+        <div class="stat-value">{{ salles_disponibles }}</div>
+        <div class="stat-sub">Salles de votre filiale</div>
+        <div class="badge blue">Local</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">Réservations en attente</div>
+        <div class="stat-value">{{ reservations_attente }}</div>
+        <div class="stat-sub">À valider</div>
+        <div class="badge orange">Action requise</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">Réservations validées</div>
+        <div class="stat-value">{{ reservations_validees }}</div>
+        <div class="stat-sub">Confirmées</div>
+        <div class="badge green">OK</div>
+    </div>
+
+</div>
+
+{% endif %}
+
+{# ================= EMPLOYE ================= #}
+
+{% if user.role == "EMPLOYE" %}
+
+    <div class="section-title">Mon activité</div>
+
+    <div class="stats-grid">
+
+        <div class="stat-card">
+            <div class="stat-label">Mes réservations</div>
+            <div class="stat-value">{{ mes_reservations }}</div>
+            <div class="stat-sub">Total demandes</div>
+            <div class="badge blue">Personnel</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">En attente</div>
+            <div class="stat-value">{{ mes_attentes }}</div>
+            <div class="stat-sub">Validation en cours</div>
+            <div class="badge orange">Workflow</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Approuvées</div>
+            <div class="stat-value">{{ mes_validees }}</div>
+            <div class="stat-sub">Réservations confirmées</div>
+            <div class="badge green">OK</div>
+        </div>
+
+    </div>
+
+{% endif %}
+
+{% endblock %}

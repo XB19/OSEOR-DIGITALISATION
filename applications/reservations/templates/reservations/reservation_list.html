@@ -1,0 +1,229 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block page_title %}
+Réservations
+{% endblock %}
+
+{% block content %}
+
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .page-header h2 {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 5px;
+        color: #0f172a;
+    }
+
+    .page-header p {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .btn-add {
+        background: #2563eb;
+        color: white;
+        padding: 10px 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-size: 14px;
+        height: fit-content;
+    }
+
+    .btn-add:hover {
+        background: #1d4ed8;
+    }
+
+    .table-wrapper {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e5e7eb;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: #f8fafc;
+    }
+
+    th, td {
+        padding: 14px;
+        font-size: 14px;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+    }
+
+    tr:hover {
+        background: #f9fafb;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    .attente {
+        background: #fff7ed;
+        color: #c2410c;
+    }
+
+    .confirmee {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    .refusee {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .actions a {
+        margin-right: 10px;
+        font-size: 13px;
+        text-decoration: none;
+        color: #2563eb;
+    }
+
+    .actions a:hover {
+        text-decoration: underline;
+    }
+
+    .muted {
+        color: #64748b;
+        font-size: 12px;
+    }
+</style>
+
+<div class="page-header">
+
+    <div>
+        <h2>Liste des réservations</h2>
+        <p>Gestion des demandes de salles et validation des créneaux</p>
+    </div>
+
+    {% if user.role in "EMPLOYE CHEF_SERVICE DIRECTEUR ADMINISTRATEUR" %}
+        <a href="{% url 'reservation_create' %}" class="btn-add">
+            + Nouvelle réservation
+        </a>
+    {% endif %}
+
+</div>
+
+
+<div class="table-wrapper">
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Demandeur</th>
+                <th>Salle</th>
+                <th>Date</th>
+                <th>Horaire</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for r in reservations %}
+
+            <tr>
+
+                <td>
+                    <strong>{{ r.nom_reservant }}</strong><br>
+                    <span class="muted">
+                        {{ r.demandeur.get_role_display }}
+                    </span>
+                </td>
+
+                <td>
+                    {{ r.salle.nom }}<br>
+                    <span class="muted">
+                        {% if r.salle.est_salle_groupe %}
+                            Groupe
+                        {% else %}
+                            {{ r.salle.filiale.nom }}
+                        {% endif %}
+                    </span>
+                </td>
+
+                <td>
+                    {{ r.date_reunion }}
+                </td>
+
+                <td>
+                    {{ r.heure_debut }} - {{ r.heure_fin }}
+                </td>
+
+                <td>
+                    {% if r.statut == "EN_ATTENTE" %}
+                        <span class="badge attente">En attente</span>
+
+                    {% elif r.statut == "CONFIRMEE" %}
+                        <span class="badge confirmee">Confirmée</span>
+
+                    {% elif r.statut == "REFUSEE" %}
+                        <span class="badge refusee">Refusée</span>
+
+                    {% elif r.statut == "ANNULEE" %}
+                        <span class="badge refusee">Annulée</span>
+
+                    {% else %}
+                        <span class="badge">{{ r.statut }}</span>
+                    {% endif %}
+                </td>
+
+                <td class="actions">
+
+                    <a href="#">Voir</a>
+
+                    {% if user.role == "EMPLOYE" and r.statut == "EN_ATTENTE" %}
+                        <a href="#">Modifier</a>
+                    {% endif %}
+
+                    {% if user.role == "CHEF_SERVICE" and r.statut == "EN_ATTENTE" %}
+                        <a href="{% url 'reservation_valider' r.id %}" style="color:green;">Valider</a>
+                        <a href="{% url 'reservation_refuser' r.id %}" style="color:red;">Refuser</a>
+                    {% endif %}
+
+                    {% if user.role == "ADMINISTRATEUR" %}
+                        <a href="#">Modifier</a>
+                        <a href="#">Supprimer</a>
+                    {% endif %}
+
+                </td>
+
+            </tr>
+
+        {% empty %}
+
+            <tr>
+                <td colspan="6" style="text-align:center; padding:20px;">
+                    Aucune réservation disponible
+                </td>
+            </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

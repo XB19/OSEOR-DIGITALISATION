@@ -1,0 +1,222 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block title %}Utilisateurs{% endblock %}
+
+{% block content %}
+
+<style>
+    :root{
+        --primary:#2563eb;
+        --danger:#dc2626;
+        --bg-card:#ffffff;
+        --text:#0f172a;
+        --muted:#64748b;
+        --border:#e5e7eb;
+        --shadow:0 10px 25px rgba(15,23,42,0.06);
+    }
+
+    /* HEADER PAGE */
+    .page-header{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:18px;
+    }
+
+    .page-title{
+        font-size:20px;
+        font-weight:800;
+        color:var(--text);
+    }
+
+    .page-subtitle{
+        font-size:13px;
+        color:var(--muted);
+        margin-top:4px;
+    }
+
+    /* BUTTON */
+    .btn-primary{
+        background:var(--primary);
+        color:white;
+        padding:10px 14px;
+        border-radius:10px;
+        text-decoration:none;
+        font-size:13px;
+        font-weight:600;
+        transition:0.2s;
+    }
+
+    .btn-primary:hover{
+        transform:translateY(-2px);
+        box-shadow:var(--shadow);
+    }
+
+    /* CARD WRAPPER */
+    .card{
+        background:var(--bg-card);
+        border:1px solid var(--border);
+        border-radius:14px;
+        overflow:hidden;
+        box-shadow:0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    /* TABLE */
+    table{
+        width:100%;
+        border-collapse:collapse;
+    }
+
+    thead{
+        background:#f8fafc;
+    }
+
+    th{
+        text-align:left;
+        font-size:12px;
+        text-transform:uppercase;
+        color:var(--muted);
+        padding:14px;
+        letter-spacing:0.5px;
+    }
+
+    td{
+        padding:14px;
+        font-size:14px;
+        border-top:1px solid var(--border);
+        color:var(--text);
+    }
+
+    tr:hover{
+        background:#f9fafb;
+    }
+
+    /* ROLE BADGE */
+    .badge{
+        padding:5px 10px;
+        border-radius:999px;
+        font-size:11px;
+        font-weight:600;
+        display:inline-block;
+    }
+
+    .admin{background:#eff6ff;color:var(--primary);}
+    .gerant{background:#ecfdf5;color:#16a34a;}
+    .employe{background:#f1f5f9;color:#475569;}
+
+    /* ACTIONS */
+    .actions a{
+        font-size:12px;
+        text-decoration:none;
+        margin-right:8px;
+        font-weight:600;
+    }
+
+    .edit{color:var(--primary);}
+    .delete{color:var(--danger);}
+
+    /* SEARCH BAR (future-ready) */
+    .toolbar{
+        display:flex;
+        gap:10px;
+        margin-bottom:15px;
+    }
+
+    .search{
+        flex:1;
+        padding:10px 12px;
+        border:1px solid var(--border);
+        border-radius:10px;
+        font-size:13px;
+        outline:none;
+    }
+
+</style>
+
+<div class="page-header">
+
+    <div>
+        <div class="page-title">Gestion des utilisateurs</div>
+        <div class="page-subtitle">
+            Administration des comptes du groupe OSEOR
+        </div>
+    </div>
+
+    <a href="{% url 'utilisateur_create' %}" class="btn-primary">
+        + Créer un utilisateur
+    </a>
+
+</div>
+
+<!-- TOOLBAR FUTURE (search ready) -->
+<div class="toolbar">
+    <input class="search" type="text" placeholder="Rechercher un utilisateur...">
+</div>
+
+<div class="card">
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>Utilisateur</th>
+                <th>Nom complet</th>
+                <th>Rôle</th>
+                <th>Filiale</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for u in users %}
+
+            <tr>
+
+                <td>
+                    <strong>{{ u.username }}</strong>
+                </td>
+
+                <td>
+                    {{ u.get_full_name|default:"-" }}
+                </td>
+
+                <td>
+                    {% if u.role == "ADMINISTRATEUR" %}
+                        <span class="badge admin">Administrateur</span>
+                    {% elif u.role == "GERANT" %}
+                        <span class="badge gerant">Gérant</span>
+                    {% else %}
+                        <span class="badge employe">Employé</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ u.filiale|default:"Groupe" }}
+                </td>
+
+                <td class="actions">
+
+                    <a class="edit" href="{% url 'utilisateur_update' u.id %}">
+                        Modifier
+                    </a>
+
+                    <a class="delete"
+                       href="{% url 'utilisateur_delete' u.id %}"
+                       onclick="return confirm('Supprimer cet utilisateur ?')">
+                        Supprimer
+                    </a>
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

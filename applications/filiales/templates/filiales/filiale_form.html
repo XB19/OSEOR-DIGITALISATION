@@ -1,0 +1,133 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block title %}Filiale{% endblock %}
+
+{% block content %}
+
+<style>
+    .form-container{
+        background:white;
+        border:1px solid #e5e7eb;
+        border-radius:16px;
+        padding:20px;
+        max-width:750px;
+    }
+
+    .form-title{
+        font-size:20px;
+        font-weight:700;
+        margin-bottom:15px;
+    }
+
+    .grid{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:12px;
+    }
+
+    .group{
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+    }
+
+    label{
+        font-size:12px;
+        color:#64748b;
+        font-weight:600;
+    }
+
+    input, textarea{
+        padding:10px 12px;
+        border:1px solid #e5e7eb;
+        border-radius:10px;
+        font-size:14px;
+        outline:none;
+    }
+
+    textarea{
+        resize:none;
+    }
+
+    input:focus, textarea:focus{
+        border-color:#2563eb;
+        box-shadow:0 0 0 3px rgba(37,99,235,0.1);
+    }
+
+    .full{
+        grid-column:span 2;
+    }
+
+    .btn{
+        margin-top:15px;
+        width:100%;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:#2563eb;
+        color:white;
+        font-weight:600;
+        cursor:pointer;
+    }
+
+    .btn:hover{
+        background:#1d4ed8;
+    }
+</style>
+
+<div class="form-container">
+
+    <div class="form-title">
+        {% if filiale_obj %}Modifier Filiale{% else %}Nouvelle Filiale{% endif %}
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <div class="grid">
+
+            <div class="group">
+                <label>Nom</label>
+                <input type="text" name="nom"
+                       value="{{ filiale_obj.nom|default:'' }}" required>
+            </div>
+
+            <div class="group">
+                <label>Code</label>
+                <input type="text" name="code"
+                       value="{{ filiale_obj.code|default:'' }}" required>
+            </div>
+
+            <div class="group full">
+                <label>Email</label>
+                <input type="email" name="email"
+                       value="{{ filiale_obj.email|default:'' }}">
+            </div>
+
+            <div class="group full">
+                <label>Téléphone</label>
+                <input type="text" name="telephone"
+                       value="{{ filiale_obj.telephone|default:'' }}">
+            </div>
+
+            <div class="group full">
+                <label>Adresse</label>
+                <textarea name="adresse" rows="3">{{ filiale_obj.adresse|default:'' }}</textarea>
+            </div>
+
+            <div class="group full">
+                <label>Description</label>
+                <textarea name="description" rows="4">{{ filiale_obj.description|default:'' }}</textarea>
+            </div>
+
+        </div>
+
+        <button class="btn">
+            Enregistrer
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

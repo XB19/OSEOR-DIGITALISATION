@@ -1,0 +1,131 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block title %}Filiales{% endblock %}
+
+{% block content %}
+
+<style>
+    .page-title{
+        font-size:20px;
+        font-weight:700;
+        margin-bottom:15px;
+    }
+
+    .top-actions{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:15px;
+    }
+
+    .btn{
+        background:#2563eb;
+        color:white;
+        padding:10px 14px;
+        border-radius:10px;
+        text-decoration:none;
+        font-size:13px;
+        font-weight:600;
+    }
+
+    .btn:hover{
+        background:#1d4ed8;
+    }
+
+    .grid{
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+        gap:15px;
+    }
+
+    .card{
+        background:white;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        padding:16px;
+        transition:.2s;
+    }
+
+    .card:hover{
+        transform:translateY(-3px);
+        box-shadow:0 10px 20px rgba(0,0,0,0.05);
+    }
+
+    .title{
+        font-size:16px;
+        font-weight:700;
+        margin-bottom:5px;
+    }
+
+    .code{
+        font-size:12px;
+        color:#64748b;
+        margin-bottom:10px;
+    }
+
+    .info{
+        font-size:13px;
+        color:#334155;
+        margin-bottom:4px;
+    }
+
+    .actions{
+        margin-top:10px;
+        display:flex;
+        gap:10px;
+    }
+
+    .actions a{
+        font-size:12px;
+        text-decoration:none;
+        padding:6px 10px;
+        border-radius:8px;
+    }
+
+    .edit{
+        background:#eff6ff;
+        color:#2563eb;
+    }
+
+    .delete{
+        background:#fef2f2;
+        color:#dc2626;
+    }
+</style>
+
+<div class="top-actions">
+    <div class="page-title">Gestion des filiales</div>
+
+    <a class="btn" href="{% url 'filiale_create' %}">
+        + Nouvelle filiale
+    </a>
+</div>
+
+<div class="grid">
+
+    {% for f in filiales %}
+
+    <div class="card">
+
+        <div class="title">{{ f.nom }}</div>
+        <div class="code">Code : {{ f.code }}</div>
+
+        <div class="info">{{ f.email }}</div>
+        <div class="info">{{ f.telephone }}</div>
+        <div class="info">{{ f.adresse|truncatechars:60 }}</div>
+
+        <div class="actions">
+            <a class="edit" href="{% url 'filiale_update' f.id %}">Modifier</a>
+            <a class="delete" href="{% url 'filiale_delete' f.id %}"
+               onclick="return confirm('Supprimer cette filiale ?')">
+               Supprimer
+            </a>
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

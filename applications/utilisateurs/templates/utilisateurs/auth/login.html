@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion | OSEOR Platform</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        :root {
+            --primary: #2563eb;   /* bleu */
+            --danger: #ef4444;    /* rouge */
+            --bg1: #0f172a;
+            --bg2: #1e293b;
+            --white: #ffffff;
+            --muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            background: linear-gradient(135deg, var(--bg1), var(--bg2));
+        }
+
+        /* ================= CARD ================= */
+        .login-card {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        .logo {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 25px;
+        }
+
+        /* ================= INPUTS ================= */
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            color: var(--white);
+            outline: none;
+            transition: 0.2s;
+        }
+
+        input::placeholder {
+            color: var(--muted);
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.2);
+        }
+
+        /* ================= BUTTON ================= */
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), #1d4ed8);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(37,99,235,0.3);
+        }
+
+        /* ================= ERROR ================= */
+        .error {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: var(--danger);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        /* ================= FOOTER ================= */
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <div class="login-card">
+
+        <div class="logo">
+            OSEOR PLATFORM
+        </div>
+
+        <div class="subtitle">
+            Connexion à votre espace de gestion
+        </div>
+
+        <form method="POST" action="{% url 'login' %}" onsubmit="console.log('FORM SUBMIT')">
+            {% csrf_token %}
+
+            <div class="input-group">
+                <input type="text" name="username" placeholder="Nom d'utilisateur" required>
+            </div>
+
+            <div class="input-group">
+                <input type="password" name="password" placeholder="Mot de passe" required>
+            </div>
+
+            <button type="submit">Se connecter</button>
+
+            {% if error %}
+                <div class="error">
+                    {{ error }}
+                </div>
+            {% endif %}
+        </form>
+
+        <div class="footer">
+            Plateforme sécurisée • OSEOR Group
+        </div>
+
+    </div>
+
+</body>
+</html>

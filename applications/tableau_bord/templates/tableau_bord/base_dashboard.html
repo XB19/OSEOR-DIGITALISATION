@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>
+        {% block title %}
+            OSEOR DIGITALISATION
+        {% endblock %}
+    </title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+
+        :root{
+            --bg:#f4f6fb;
+
+            --sidebar:#0b1220;
+            --sidebar-hover:#111c33;
+
+            --primary:#2563eb;
+            --danger:#dc2626;
+            --success:#16a34a;
+
+            --text:#0f172a;
+            --muted:#64748b;
+
+            --white:#ffffff;
+            --border:#e5e7eb;
+        }
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+        }
+
+        body{
+            background:var(--bg);
+            color:var(--text);
+            display:flex;
+        }
+
+        /* ==================================================
+           SIDEBAR
+        ================================================== */
+
+        .sidebar{
+            width:280px;
+            height:100vh;
+            overflow-y:auto;
+
+            position:fixed;
+            top:0;
+            left:0;
+
+            background:var(--sidebar);
+
+            padding:20px;
+        }
+
+        .brand{
+            margin-bottom:25px;
+        }
+
+        .brand-title{
+            color:white;
+            font-size:16px;
+            font-weight:700;
+            letter-spacing:1px;
+        }
+
+        .brand-subtitle{
+            color:#94a3b8;
+            font-size:12px;
+            margin-top:4px;
+        }
+
+        /* ==================================================
+           PROFILE
+        ================================================== */
+
+        .profile{
+            display:flex;
+            align-items:center;
+            gap:12px;
+
+            background:rgba(255,255,255,.05);
+
+            border-radius:12px;
+
+            padding:12px;
+
+            margin-bottom:25px;
+        }
+
+        .avatar{
+            width:45px;
+            height:45px;
+
+            border-radius:50%;
+
+            background:linear-gradient(
+                135deg,
+                var(--primary),
+                var(--danger)
+            );
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            color:white;
+            font-weight:700;
+        }
+
+        .profile-info{
+            display:flex;
+            flex-direction:column;
+        }
+
+        .profile-info b{
+            color:white;
+            font-size:13px;
+        }
+
+        .profile-info span{
+            color:#94a3b8;
+            font-size:12px;
+        }
+
+        .profile-info small{
+            color:#64748b;
+            font-size:11px;
+        }
+
+        /* ==================================================
+           MENUS
+        ================================================== */
+
+        .menu-title{
+            color:#64748b;
+            text-transform:uppercase;
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:1px;
+
+            margin-top:20px;
+            margin-bottom:8px;
+        }
+
+        .nav{
+            display:flex;
+            flex-direction:column;
+            gap:5px;
+        }
+
+        .nav a{
+            text-decoration:none;
+            color:#cbd5e1;
+
+            padding:10px 12px;
+            border-radius:10px;
+
+            transition:.2s;
+            font-size:14px;
+        }
+
+        .nav a:hover{
+            background:var(--sidebar-hover);
+            color:white;
+        }
+
+        .nav a.active{
+            background:rgba(37,99,235,.15);
+            border-left:3px solid var(--primary);
+            color:white;
+        }
+
+        .divider{
+            margin:20px 0;
+            border-top:1px solid rgba(255,255,255,.08);
+        }
+
+        .logout a{
+            display:block;
+
+            text-decoration:none;
+
+            color:#fca5a5;
+
+            padding:10px 12px;
+            border-radius:10px;
+        }
+
+        .logout a:hover{
+            background:rgba(220,38,38,.10);
+        }
+
+        /* ==================================================
+           MAIN
+        ================================================== */
+
+        .main{
+            margin-left:280px;
+            width:calc(100% - 280px);
+
+            padding:20px;
+        }
+
+        /* ==================================================
+           TOPBAR
+        ================================================== */
+
+        .topbar{
+            background:white;
+
+            border:1px solid var(--border);
+            border-radius:14px;
+
+            padding:15px 20px;
+
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+
+            margin-bottom:20px;
+        }
+
+        .welcome h2{
+            font-size:20px;
+            margin-bottom:4px;
+        }
+
+        .welcome p{
+            color:var(--muted);
+            font-size:13px;
+        }
+
+        .topbar-right{
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
+
+        .badge{
+            background:#eff6ff;
+            color:var(--primary);
+
+            padding:6px 12px;
+
+            border-radius:999px;
+
+            font-size:12px;
+            font-weight:600;
+        }
+
+        .notification{
+            background:#fff7ed;
+            color:#ea580c;
+
+            padding:6px 12px;
+
+            border-radius:999px;
+
+            font-size:12px;
+            font-weight:600;
+        }
+
+        /* ==================================================
+           CONTENT
+        ================================================== */
+
+        .content{
+            padding:5px;
+        }
+
+        /* ==================================================
+           RESPONSIVE
+        ================================================== */
+
+        @media(max-width:900px){
+
+            .sidebar{
+                display:none;
+            }
+
+            .main{
+                width:100%;
+                margin-left:0;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+
+    <div class="brand">
+
+        <div class="brand-title">
+            OSEOR DIGITALISATION
+        </div>
+
+        <div class="brand-subtitle">
+            Gestion numérique des processus administratifs
+        </div>
+
+    </div>
+
+    <div class="profile">
+
+        <div class="avatar">
+            {{ user.username|slice:":1"|upper }}
+        </div>
+
+        <div class="profile-info">
+
+            <b>{{ user.nom_complet }}</b>
+
+            <span>{{ user.get_role_display }}</span>
+
+            <small>
+                {% if user.filiale %}
+                    {{ user.filiale.nom }}
+                {% else %}
+                    Administration Groupe
+                {% endif %}
+            </small>
+
+        </div>
+
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="menu-title">Tableau de bord</div>
+
+    <div class="nav">
+        <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
+    </div>
+
+    <!-- ================= ADMINISTRATEUR ================= -->
+    {% if user.role == "ADMINISTRATEUR" %}
+
+        <div class="menu-title">Administration</div>
+
+        <div class="nav">
+            <a href="{% url 'utilisateur_list' %}">Utilisateurs</a>
+            <a href="{% url 'filiale_list' %}">Filiales</a>
+            <a href="#">Rôles & permissions</a>
+        </div>
+
+        <div class="menu-title">Modules globaux</div>
+
+        <div class="nav">
+            <a href="#">Toutes les salles</a>
+            <a href="#">Réservations globales</a>
+        </div>
+
+        <div class="menu-title">Système</div>
+
+        <div class="nav">
+            <a href="#">Journal d'activité</a>
+            <a href="#">Paramètres</a>
+        </div>
+
+    {% elif user.role == "DIRECTEUR" %}
+
+        <div class="menu-title">Validation</div>
+
+        <div class="nav">
+            <a href="#">Demandes à valider</a>
+            <a href="#">Historique validations</a>
+        </div>
+
+        <div class="menu-title">Filiale</div>
+
+        <div class="nav">
+            <a href="#">Salles de la filiale</a>
+            <a href="#">Calendrier</a>
+        </div>
+
+{% elif user.role == "CHEF_SERVICE" %}
+
+<div class="menu-title">
+    Gestion des réservations
+</div>
+
+<div class="nav">
+    <a href="{% url 'reservation_list' %}">
+        Demandes de réservation
+    </a>
+
+    <a href="{% url 'reservation_create' %}">
+        Nouvelle réservation
+    </a>
+</div>
+
+<div class="menu-title">
+    Gestion des salles
+</div>
+
+<div class="nav">
+    <a href="{% url 'salle_list' %}">
+        Salles de ma filiale
+    </a>
+
+    <a href="{% url 'salle_create' %}">
+        Créer une salle
+    </a>
+</div>
+
+    {% elif user.role == "EMPLOYE" %}
+
+        <div class="menu-title">Réservations</div>
+
+        <div class="nav">
+            <a href="{% url 'reservation_list' %}">Nouvelle réservation</a>
+            <a href="{% url 'reservation_mes_reservations' %}">Mes réservations</a>
+        </div>
+
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="logout">
+
+        <a href="{% url 'logout' %}">
+            Déconnexion
+        </a>
+
+    </div>
+
+</div>
+
+<div class="main">
+
+    <div class="topbar">
+
+        <div class="welcome">
+
+            <h2>
+                {% block page_title %}
+                    Tableau de bord
+                {% endblock %}
+            </h2>
+
+            <p>
+                Gestion des processus administratifs et réservation des salles du groupe OSEOR.
+            </p>
+
+        </div>
+
+        <div class="topbar-right">
+
+            <div class="notification">
+                Notifications
+            </div>
+
+            <div class="badge">
+                {{ user.get_role_display }}
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="content">
+
+        {% block content %}
+        {% endblock %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,94 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block page_title %}
+Salle
+{% endblock %}
+
+{% block content %}
+
+<div style="max-width:700px; margin:auto; background:white; padding:25px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.05);">
+
+    <h2 style="margin-bottom:20px;">
+        {% if salle %}
+            Modifier la salle
+        {% else %}
+            Créer une salle
+        {% endif %}
+    </h2>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <!-- Nom -->
+        <input type="text"
+               name="nom"
+               placeholder="Nom de la salle"
+               value="{{ salle.nom|default:'' }}"
+               required
+               style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+
+        <!-- Capacité -->
+        <input type="number"
+               name="capacite"
+               placeholder="Capacité"
+               value="{{ salle.capacite|default:'' }}"
+               required
+               style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+
+        <!-- Description -->
+        <textarea name="description"
+                  placeholder="Description"
+                  style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+            {{ salle.description|default:'' }}
+        </textarea>
+
+        <!-- Filiale -->
+        <select name="filiale"
+                style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+
+            <option value="">-- Filiale --</option>
+
+            {% for f in filiales %}
+                <option value="{{ f.id }}"
+                    {% if salle.filiale.id == f.id %}selected{% endif %}>
+                    {{ f.nom }}
+                </option>
+            {% endfor %}
+
+        </select>
+
+        <!-- Salle groupe -->
+        <label style="display:block; margin-bottom:10px;">
+            <input type="checkbox" name="est_salle_groupe"
+                {% if salle.est_salle_groupe %}checked{% endif %}>
+            Salle groupe
+        </label>
+
+        <!-- Équipements -->
+        <div style="margin-bottom:10px;">
+            <b>Équipements</b><br>
+
+            {% for key, label in salle.Equipement.choices %}
+
+                <label style="display:block;">
+                    <input type="checkbox"
+                           name="equipements"
+                           value="{{ key }}"
+                           {% if key in salle.equipements %}checked{% endif %}>
+                    {{ label }}
+                </label>
+
+            {% endfor %}
+        </div>
+
+        <!-- Bouton -->
+        <button type="submit"
+                style="width:100%; padding:12px; background:#2563eb; color:white; border:none; border-radius:8px;">
+            Enregistrer
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

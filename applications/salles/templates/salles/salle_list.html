@@ -1,0 +1,78 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block page_title %}
+Gestion des salles
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <h2>Liste des salles</h2>
+
+    {% if user.role == "ADMINISTRATEUR" or user.role == "CHEF_SERVICE" %}
+        <a href="{% url 'salle_create' %}"
+           style="padding:10px 15px; background:#2563eb; color:white; border-radius:8px; text-decoration:none;">
+            + Ajouter une salle
+        </a>
+    {% endif %}
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:15px;">
+
+    {% for s in salles %}
+
+    <div style="background:white; border-radius:12px; padding:15px; box-shadow:0 5px 15px rgba(0,0,0,0.05);">
+
+        <h3 style="margin-bottom:5px;">
+            {{ s.nom }}
+        </h3>
+
+        <p style="font-size:13px; color:#64748b;">
+            {% if s.est_salle_groupe %}
+                Salle Groupe
+            {% else %}
+                {{ s.filiale.nom }}
+            {% endif %}
+        </p>
+
+        <p style="margin:10px 0;">
+            👥 Capacité : <b>{{ s.capacite }}</b>
+        </p>
+
+        <p style="font-size:13px;">
+            🧰 Équipements :
+            {% for e in s.equipements %}
+                <span style="background:#f1f5f9; padding:3px 8px; border-radius:6px; font-size:12px;">
+                    {{ e }}
+                </span>
+            {% empty %}
+                Aucun
+            {% endfor %}
+        </p>
+
+        <div style="margin-top:15px; display:flex; gap:10px;">
+
+            <a href="{% url 'salle_update' s.id %}"
+               style="flex:1; text-align:center; padding:8px; background:#f59e0b; color:white; border-radius:8px; text-decoration:none;">
+                Modifier
+            </a>
+
+            <a href="{% url 'salle_delete' s.id %}"
+               onclick="return confirm('Supprimer cette salle ?')"
+               style="flex:1; text-align:center; padding:8px; background:#ef4444; color:white; border-radius:8px; text-decoration:none;">
+                Supprimer
+            </a>
+
+        </div>
+
+    </div>
+
+    {% empty %}
+
+    <p>Aucune salle disponible.</p>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}

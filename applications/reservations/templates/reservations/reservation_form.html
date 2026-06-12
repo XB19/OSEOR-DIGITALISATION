@@ -1,0 +1,134 @@
+{% extends "tableau_bord/base_dashboard.html" %}
+
+{% block title %}Nouvelle réservation{% endblock %}
+
+{% block content %}
+
+<style>
+    .page-header {
+        margin-bottom: 20px;
+    }
+
+    .page-header h2 {
+        font-size: 22px;
+        font-weight: 700;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        padding: 20px;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    label {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    input, select, textarea {
+        width: 100%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+
+    textarea {
+        min-height: 90px;
+    }
+
+    .full {
+        grid-column: 1 / -1;
+    }
+
+    .btn {
+        margin-top: 15px;
+        background: #2563eb;
+        color: white;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .btn:hover {
+        background: #1d4ed8;
+    }
+
+    .hint {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+</style>
+
+<div class="page-header">
+    <h2>Nouvelle réservation</h2>
+</div>
+
+<div class="form-card">
+
+    <form method="POST">
+        {% csrf_token %}
+
+        <div class="grid">
+
+            <div class="full">
+                <label>Nom du réservant</label>
+                <input type="text" value="{{ request.user.nom_complet }}" readonly>
+            </div>
+
+            <div>
+                <label>Salle</label>
+                <select name="salle" required>
+                    <option value="">-- Choisir --</option>
+                    {% for s in salles %}
+                        <option value="{{ s.id }}">{{ s.nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label>Date</label>
+                <input type="date" name="date_reunion" required>
+            </div>
+
+            <div>
+                <label>Heure début</label>
+                <input type="time" name="heure_debut" required>
+            </div>
+
+            <div>
+                <label>Heure fin</label>
+                <input type="time" name="heure_fin" required>
+            </div>
+
+            <div class="full">
+                <label>Précisions</label>
+                <textarea name="precisions"></textarea>
+            </div>
+
+        </div>
+
+        <button type="submit" class="btn">
+            Envoyer la demande
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}
