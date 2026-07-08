@@ -31,16 +31,11 @@ class Salle(models.Model):
 
     filiale = models.ForeignKey(
         Filiale,
-        verbose_name="Filiale",
-        on_delete=models.CASCADE,
+        verbose_name="Filiale propriétaire",
+        on_delete=models.PROTECT,
         related_name="salles",
-        null=True,
-        blank=True
-    )
-
-    est_salle_groupe = models.BooleanField(
-        verbose_name="Salle commune au groupe",
-        default=False
+        help_text="Filiale qui possède et gère la salle. "
+                  "Ses réservations sont validées par le secrétariat de cette filiale."
     )
 
     description = models.TextField(
@@ -86,7 +81,4 @@ class Salle(models.Model):
         ordering = ["nom"]
 
     def __str__(self):
-        if self.est_salle_groupe:
-            return f"{self.nom} (Groupe)"
-
         return f"{self.nom} ({self.filiale.nom})"

@@ -24,17 +24,9 @@ def reservation_create(request):
     # =========================
     # SALLES VISIBLES
     # =========================
-    if user.role == "ADMINISTRATEUR":
-        salles = Salle.objects.all()
-
-    elif user.role in ["EMPLOYE", "CHEF_SERVICE", "DIRECTEUR"]:
-        if user.filiale:
-            salles = Salle.objects.filter(
-                Q(filiale=user.filiale) |
-                Q(est_salle_groupe=True)
-            )
-        else:
-            salles = Salle.objects.filter(est_salle_groupe=True)
+    # RG-03 : un employé peut réserver une salle de n'importe quelle filiale.
+    if user.role in ["ADMINISTRATEUR", "EMPLOYE", "CHEF_SERVICE", "DIRECTEUR"]:
+        salles = Salle.objects.filter(active=True)
 
     else:
         salles = Salle.objects.none()
@@ -120,7 +112,7 @@ def reservation_valider(request, pk):
     if user.role != "CHEF_SERVICE":
         return redirect("dashboard")
 
-    reservation.statut = Reservation.Statut.CONFIRMEE
+    reservation.statut = Reservation.Statut.VALIDEE
     reservation.valide_par = user
     reservation.date_validation = timezone.now()
     reservation.save()

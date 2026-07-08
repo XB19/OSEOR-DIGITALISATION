@@ -1,14 +1,66 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 from .models import Notification
 
 
 def envoyer_notification(utilisateur, titre, message, type_notification="INFO"):
     """
-    Crée une notification pour un utilisateur.
+    Crée une notification in-app et la pousse en temps réel via WebSocket
+    (EF-18 / RG-12). L'envoi e-mail est géré en parallèle par le caller
+    ou un signal (backend console en dev).
     """
 
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         utilisateur=utilisateur,
         titre=titre,
         message=message,
-        type=type_notification
+        type=type_notification,
     )
+
+    _pousser_temps_reel(notification)
+    _envoyer_email(utilisateur, titre, message)
+    return notification
+
+
+def _envoyer_email(utilisateur, titre, message):
+    """Envoi e-mail best-effort (console en dev, Office 365 en prod)."""
+    email = getattr(utilisateur, "email", "")
+    if not email:
+        return
+    try:
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        send_mail(
+            subject=f"[OSEOR] {titre}",
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
+
+
+def _pousser_temps_reel(notification):
+    """Pousse la notification sur le groupe WebSocket de l'utilisateur."""
+    layer = get_channel_layer()
+    if layer is None:
+        return
+    contenu = {
+        "id": notification.id,
+        "titre": notification.titre,
+        "message": notification.message,
+        "type": notification.type,
+        "lu": notification.lu,
+        "date_creation": notification.date_creation.isoformat(),
+    }
+    try:
+        async_to_sync(layer.group_send)(
+            f"notifs_{notification.utilisateur_id}",
+            {"type": "notifier", "contenu": contenu},
+        )
+    except Exception:
+        # Le temps réel ne doit jamais bloquer la création de la notification.
+        pass

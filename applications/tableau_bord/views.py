@@ -43,7 +43,7 @@ def dashboard(request):
 
             "reservations_validees": Reservation.objects.filter(
                 salle__filiale=user.filiale,
-                statut="CONFIRMEE"
+                statut="VALIDEE"
             ).count(),
         }
 
@@ -51,24 +51,19 @@ def dashboard(request):
 
     elif user.role == "CHEF_SERVICE":
 
-        salles_qs = Salle.objects.filter(
-            Q(filiale=user.filiale) |
-            Q(est_salle_groupe=True)
-        )
+        salles_qs = Salle.objects.filter(filiale=user.filiale)
 
         context = {
             "salles_disponibles": salles_qs.count(),
 
             "reservations_attente": Reservation.objects.filter(
-                Q(salle__filiale=user.filiale) |
-                Q(salle__est_salle_groupe=True),
+                salle__filiale=user.filiale,
                 statut="EN_ATTENTE"
             ).count(),
 
             "reservations_validees": Reservation.objects.filter(
-                Q(salle__filiale=user.filiale) |
-                Q(salle__est_salle_groupe=True),
-                statut="CONFIRMEE"
+                salle__filiale=user.filiale,
+                statut="VALIDEE"
             ).count(),
         }
 
@@ -88,7 +83,7 @@ def dashboard(request):
 
             "mes_validees": Reservation.objects.filter(
                 demandeur=user,
-                statut="CONFIRMEE"
+                statut="VALIDEE"
             ).count(),
         }
 

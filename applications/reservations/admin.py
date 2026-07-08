@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Reservation, Participant
+from .models import Reservation, Participant, SerieRecurrence
 
 
 class ParticipantInline(admin.TabularInline):
@@ -59,7 +59,10 @@ class ReservationAdmin(admin.ModelAdmin):
                 "fields": (
                     "demandeur",
                     "nom_reservant",
+                    "telephone",
+                    "motif",
                     "salle",
+                    "serie",
                 )
             },
         ),
@@ -118,16 +121,53 @@ class ReservationAdmin(admin.ModelAdmin):
 class ParticipantAdmin(admin.ModelAdmin):
 
     list_display = (
-        "nom_complet",
+        "nom",
+        "prenom",
+        "type_participant",
+        "societe",
         "email",
+        "telephone",
         "reservation",
     )
 
+    list_filter = (
+        "type_participant",
+    )
+
     search_fields = (
-        "nom_complet",
+        "nom",
+        "prenom",
         "email",
+        "societe",
     )
 
     ordering = (
-        "nom_complet",
+        "nom",
+        "prenom",
     )
+
+
+@admin.register(SerieRecurrence)
+class SerieRecurrenceAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "salle",
+        "frequence",
+        "date_debut",
+        "date_fin",
+        "heure_debut",
+        "heure_fin",
+        "demandeur",
+    )
+
+    list_filter = (
+        "frequence",
+        "salle__filiale",
+    )
+
+    search_fields = (
+        "nom_reservant",
+        "salle__nom",
+    )
+
+    date_hierarchy = "date_debut"

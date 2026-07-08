@@ -38,21 +38,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Application definition
 
 INSTALLED_APPS = [
+    # daphne en tête pour fournir le serveur ASGI (runserver)
+    'daphne',
+    'channels',
+
     'applications.tableau_bord',
     'applications.notifications',
     'applications.reservations',
+    'applications.audiences',
     'applications.salles',
     'applications.filiales',
     'applications.utilisateurs',
+    'applications.journalisation',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Tierces parties
+    'rest_framework',
+    'django_filters',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,6 +92,31 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel layer pour les WebSockets.
+# - InMemory : OK uniquement si HTTP et WebSocket sont dans le MÊME processus
+#   (ex. `manage.py runserver`).
+# - Redis : nécessaire dès qu'on sépare l'API (WSGI/waitress) et le WebSocket
+#   (daphne) en 2 processus, car la couche doit être partagée entre eux.
+# Active automatiquement Redis si REDIS_URL est défini (ex. redis://127.0.0.1:6379/0).
+REDIS_URL = config("REDIS_URL", default="")
+
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            # Variante pub/sub : abonnement persistant, robuste pour les
+            # connexions WebSocket longue durée (pas de timeout de lecture).
+            "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 
 # Database
@@ -98,6 +135,17 @@ DATABASES = {
         'HOST': config('DB_HOST'),
 
         'PORT': config('DB_PORT'),
+
+        # Connexions persistantes : évite de rouvrir une connexion (handshake
+        # SSL + latence réseau vers Supabase eu-west-1) à CHAQUE requête.
+        # Sûr avec le pooler en mode session (port 5432).
+        'CONN_MAX_AGE': config('DB_CONN_MAX_AGE', default=600, cast=int),
+        'CONN_HEALTH_CHECKS': True,
+
+        # SSL requis pour Supabase, pas nécessaire en local
+        'OPTIONS': {
+            'sslmode': config('DB_SSLMODE', default='prefer'),
+        },
     }
 }
 
@@ -150,3 +198,137 @@ AUTH_USER_MODEL = "utilisateurs.Utilisateur"
 CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
 ]
+
+
+# =====================================================================
+# API REST (Django REST Framework) + Authentification JWT
+# =====================================================================
+
+from datetime import timedelta
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.OseorPagination",
+    "PAGE_SIZE": 25,
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+}
+
+
+# =====================================================================
+# CORS (frontend Angular en dev)
+# =====================================================================
+
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:4200,http://127.0.0.1:4200",
+).split(",")
+
+CORS_ALLOW_CREDENTIALS = True
+
+
+# =====================================================================
+# Email (console en dev — affiche les mails dans le terminal)
+# =====================================================================
+
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default="no-reply@oseor-digitalisation.local",
+)
+
+# SMTP (prod — ex. Office 365 : smtp.office365.com:587, TLS)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+
+
+# =====================================================================
+# Fichiers statiques collectés (prod : collectstatic + nginx/WhiteNoise)
+# =====================================================================
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+
+# =====================================================================
+# Durcissement sécurité — actif uniquement en PRODUCTION (DEBUG=False)
+# =====================================================================
+
+if not DEBUG:
+    # HTTPS / cookies sécurisés
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Derrière un reverse proxy (nginx) qui termine le TLS
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # HSTS
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # En-têtes de protection
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
+    # CORS : en prod, restreindre aux domaines déclarés (jamais '*')
+    CORS_ALLOW_ALL_ORIGINS = False
+
+
+# =====================================================================
+# Active Directory local — authentification LDAP (optionnel)
+# Active si LDAP_SERVER_URI est défini dans .env.
+# Nécessite : pip install ldap3
+# =====================================================================
+
+LDAP_SERVER_URI = config('LDAP_SERVER_URI', default='')
+LDAP_DOMAIN = config('LDAP_DOMAIN', default='')
+LDAP_BASE_DN = config('LDAP_BASE_DN', default='')
+LDAP_BIND_DN = config('LDAP_BIND_DN', default='')
+LDAP_BIND_PASSWORD = config('LDAP_BIND_PASSWORD', default='')
+
+if LDAP_SERVER_URI and LDAP_DOMAIN:
+    # Backend LDAP en priorité, local en fallback (admin Django, comptes de test)
+    AUTHENTICATION_BACKENDS = [
+        'applications.utilisateurs.ldap_backend.OseorLDAPBackend',
+        'django.contrib.auth.backends.ModelBackend',
+    ]
+
+
+# =====================================================================
+# Tests : base SQLite en mémoire (rapide, sans Supabase ni Redis)
+# =====================================================================
+
+import sys  # noqa: E402
+
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    }
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

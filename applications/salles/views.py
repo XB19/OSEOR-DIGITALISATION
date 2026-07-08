@@ -21,9 +21,7 @@ def salle_list(request):
         salles = Salle.objects.all()
 
     elif user.role == "CHEF_SERVICE":
-        salles = Salle.objects.filter(
-Q(filiale=user.filiale) | Q(est_salle_groupe=True)
-        )
+        salles = Salle.objects.filter(filiale=user.filiale)
 
     else:
         return redirect("dashboard")
@@ -49,14 +47,11 @@ def salle_create(request):
     if request.method == "POST":
 
         filiale_id = request.POST.get("filiale")
-        if filiale_id == "":
-            filiale_id = None
 
         salle = Salle.objects.create(
             nom=request.POST.get("nom"),
             capacite=request.POST.get("capacite"),
             description=request.POST.get("description"),
-            est_salle_groupe=request.POST.get("est_salle_groupe") == "on",
             filiale_id=filiale_id,
         )
 
@@ -87,8 +82,7 @@ def salle_update(request, pk):
         salle.nom = request.POST.get("nom")
         salle.capacite = request.POST.get("capacite")
         salle.description = request.POST.get("description")
-        salle.est_salle_groupe = bool(request.POST.get("est_salle_groupe"))
-        salle.filiale_id = request.POST.get("filiale") or None
+        salle.filiale_id = request.POST.get("filiale")
 
         salle.equipements = request.POST.getlist("equipements")
 

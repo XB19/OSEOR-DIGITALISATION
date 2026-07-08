@@ -28,6 +28,11 @@ class Utilisateur(AbstractUser):
             "Directeur"
         )
 
+        SECRETAIRE = (
+            "SECRETAIRE",
+            "Secrétaire / Assistante de direction"
+        )
+
         CHEF_SERVICE = (
             "CHEF_SERVICE",
             "Chef de service"
@@ -133,6 +138,10 @@ class Utilisateur(AbstractUser):
     @property
     def est_directeur(self):
         return self.role == self.Role.DIRECTEUR
+
+    @property
+    def est_secretaire(self):
+        return self.role == self.Role.SECRETAIRE
 
     @property
     def est_chef_service(self):

@@ -1,0 +1,110 @@
+from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
+User = get_user_model()
+
+
+class UtilisateurSerializer(serializers.ModelSerializer):
+    """Lecture d'un utilisateur (annuaire, profil)."""
+
+    nom_complet = serializers.CharField(read_only=True)
+    role_libelle = serializers.CharField(source="get_role_display", read_only=True)
+    filiale_nom = serializers.CharField(source="filiale.nom", read_only=True, default=None)
+    source_auth = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "nom_complet",
+            "email",
+            "telephone",
+            "role",
+            "role_libelle",
+            "filiale",
+            "filiale_nom",
+            "actif",
+            "is_active",
+            "source_auth",
+        )
+        read_only_fields = ("id", "is_active", "source_auth")
+
+    def get_source_auth(self, obj) -> str:
+        """'SSO' si le compte se connecte via Azure AD, 'LOCAL' sinon."""
+        return 'SSO' if not obj.has_usable_password() else 'LOCAL'
+
+
+class UtilisateurEcritureSerializer(serializers.ModelSerializer):
+    """
+    Création / modification d'un utilisateur par l'administrateur.
+
+    RG-05 : un compte secrétaire n'est actif que si une filiale lui est
+    attribuée. On reflète cette règle sur le champ Django `is_active`.
+    """
+
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "telephone",
+            "role",
+            "filiale",
+            "actif",
+            "password",
+        )
+
+    def _appliquer_regle_secretaire(self, instance):
+        # RG-05 : secrétaire sans filiale => compte inactif
+        if instance.role == User.Role.SECRETAIRE and instance.filiale is None:
+            instance.is_active = False
+            instance.actif = False
+        else:
+            instance.is_active = instance.actif
+        return instance
+
+    def create(self, validated_data):
+        password = validated_data.pop("password", "") or None
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        self._appliquer_regle_secretaire(user)
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", "")
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        self._appliquer_regle_secretaire(instance)
+        instance.save()
+        return instance
+
+
+class MoiSerializer(UtilisateurSerializer):
+    """Profil de l'utilisateur connecté (endpoint /api/auth/me)."""
+
+    permissions = serializers.SerializerMethodField()
+
+    class Meta(UtilisateurSerializer.Meta):
+        fields = UtilisateurSerializer.Meta.fields + ("permissions",)
+
+    def get_permissions(self, obj):
+        return {
+            "est_administrateur": obj.role == User.Role.ADMINISTRATEUR,
+            "est_secretaire": obj.role == User.Role.SECRETAIRE,
+            "est_directeur": obj.role == User.Role.DIRECTEUR,
+            "est_employe": obj.role == User.Role.EMPLOYE,
+        }

@@ -1,0 +1,383 @@
+[
+  {
+    "model": "filiales.filiale",
+    "pk": 1,
+    "fields": {
+      "nom": "OSEOR Siège",
+      "code": "OSEOR",
+      "description": "Siège social du groupe OSEOR",
+      "email": "siege@oseor.com",
+      "telephone": "+228 22 00 00 01",
+      "adresse": "Lomé, Togo",
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "filiales.filiale",
+    "pk": 2,
+    "fields": {
+      "nom": "KAPI",
+      "code": "KAPI",
+      "description": "Filiale KAPI du groupe OSEOR",
+      "email": "contact@kapi.com",
+      "telephone": "+228 22 00 00 02",
+      "adresse": "Lomé, Togo",
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "filiales.filiale",
+    "pk": 3,
+    "fields": {
+      "nom": "BONICI",
+      "code": "BONICI",
+      "description": "Filiale BONICI du groupe OSEOR",
+      "email": "contact@bonici.com",
+      "telephone": "+228 22 00 00 03",
+      "adresse": "Lomé, Togo",
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "filiales.parametrefiliale",
+    "pk": 1,
+    "fields": {
+      "filiale": 1,
+      "delai_min_reservation": 30,
+      "duree_max_reservation": 480,
+      "nb_max_reservations_actives": 5,
+      "delai_annulation": 60
+    }
+  },
+  {
+    "model": "filiales.parametrefiliale",
+    "pk": 2,
+    "fields": {
+      "filiale": 2,
+      "delai_min_reservation": 30,
+      "duree_max_reservation": 480,
+      "nb_max_reservations_actives": 5,
+      "delai_annulation": 60
+    }
+  },
+  {
+    "model": "filiales.parametrefiliale",
+    "pk": 3,
+    "fields": {
+      "filiale": 3,
+      "delai_min_reservation": 30,
+      "duree_max_reservation": 480,
+      "nb_max_reservations_actives": 5,
+      "delai_annulation": 60
+    }
+  },
+  {
+    "model": "salles.salle",
+    "pk": 1,
+    "fields": {
+      "nom": "Salle Conseil",
+      "filiale": 1,
+      "description": "Grande salle pour les réunions de direction et conseils du groupe.",
+      "capacite": 20,
+      "equipements": ["VIDEO_PROJECTEUR", "TABLEAU_BLANC"],
+      "photo": null,
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "salles.salle",
+    "pk": 2,
+    "fields": {
+      "nom": "Salle Innovation",
+      "filiale": 1,
+      "description": "Salle moderne dédiée aux ateliers et brainstormings.",
+      "capacite": 10,
+      "equipements": ["TABLEAU_BLANC", "POINTEUR_LASER"],
+      "photo": null,
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "salles.salle",
+    "pk": 3,
+    "fields": {
+      "nom": "Salle Formation KAPI",
+      "filiale": 2,
+      "description": "Salle de formation équipée pour les présentations.",
+      "capacite": 15,
+      "equipements": ["VIDEO_PROJECTEUR"],
+      "photo": null,
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "salles.salle",
+    "pk": 4,
+    "fields": {
+      "nom": "Salle Réunion BONICI",
+      "filiale": 3,
+      "description": "Salle de réunion de la filiale BONICI.",
+      "capacite": 8,
+      "equipements": ["VIDEO_PROJECTEUR", "TABLEAU_BLANC"],
+      "photo": null,
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 1,
+    "fields": {
+      "username": "admin",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Admin",
+      "last_name": "OSEOR",
+      "email": "admin@oseor.com",
+      "telephone": "+228 90 00 00 01",
+      "role": "ADMINISTRATEUR",
+      "filiale": 1,
+      "actif": true,
+      "is_active": true,
+      "is_staff": true,
+      "is_superuser": true,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 2,
+    "fields": {
+      "username": "directeur",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Kokou",
+      "last_name": "MENSAH",
+      "email": "k.mensah@oseor.com",
+      "telephone": "+228 90 00 00 02",
+      "role": "DIRECTEUR",
+      "filiale": 1,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 3,
+    "fields": {
+      "username": "secretaire",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Ama",
+      "last_name": "KOFFI",
+      "email": "a.koffi@oseor.com",
+      "telephone": "+228 90 00 00 03",
+      "role": "SECRETAIRE",
+      "filiale": 1,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 4,
+    "fields": {
+      "username": "chef.service",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Remon",
+      "last_name": "AGBE",
+      "email": "r.agbe@oseor.com",
+      "telephone": "+228 90 00 00 04",
+      "role": "CHEF_SERVICE",
+      "filiale": 2,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 5,
+    "fields": {
+      "username": "comptable",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Efua",
+      "last_name": "AMEGA",
+      "email": "e.amega@oseor.com",
+      "telephone": "+228 90 00 00 05",
+      "role": "COMPTABLE",
+      "filiale": 2,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 6,
+    "fields": {
+      "username": "rh",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Akosua",
+      "last_name": "DOSSOU",
+      "email": "a.dossou@oseor.com",
+      "telephone": "+228 90 00 00 06",
+      "role": "RH",
+      "filiale": 3,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 7,
+    "fields": {
+      "username": "employe",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Kwame",
+      "last_name": "TOGBE",
+      "email": "k.togbe@oseor.com",
+      "telephone": "+228 90 00 00 07",
+      "role": "EMPLOYE",
+      "filiale": 3,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 8,
+    "fields": {
+      "username": "secretaire.kapi",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Adjoa",
+      "last_name": "LAWSON",
+      "email": "a.lawson@kapi.com",
+      "telephone": "+228 90 00 00 08",
+      "role": "SECRETAIRE",
+      "filiale": 2,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "utilisateurs.utilisateur",
+    "pk": 9,
+    "fields": {
+      "username": "secretaire.bonici",
+      "password": "pbkdf2_sha256$1200000$NOREFA8HzQyIpOc6vNYv9A$+cNBxxd5OJKOdABpjDo3wYdaZxOBzbihvjeUtlw+dZs=",
+      "first_name": "Essi",
+      "last_name": "GNASSOU",
+      "email": "e.gnassou@bonici.com",
+      "telephone": "+228 90 00 00 09",
+      "role": "SECRETAIRE",
+      "filiale": 3,
+      "actif": true,
+      "is_active": true,
+      "is_staff": false,
+      "is_superuser": false,
+      "date_joined": "2025-01-01T08:00:00Z",
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z",
+      "last_login": null,
+      "photo_profil": null,
+      "signature": null,
+      "derniere_connexion_mobile": null,
+      "groups": [],
+      "user_permissions": []
+    }
+  }
+]
