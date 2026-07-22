@@ -1,0 +1,81 @@
+# Lancement complet : docker compose up --build
+# Frontend -> http://localhost
+# API REST -> http://localhost/api  (ou http://localhost:8000/api en direct)
+# Admin    -> http://localhost/admin
+
+x-django-env: &django-env
+  SECRET_KEY: ${SECRET_KEY:-change-moi-en-prod-docker}
+  DEBUG: ${DEBUG:-True}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+  DB_NAME: ${DB_NAME:-oseordigitalisation}
+  DB_USER: ${DB_USER:-oseor}
+  DB_PASSWORD: ${DB_PASSWORD:-oseor}
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_SSLMODE: disable
+  REDIS_URL: redis://redis:6379/0
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-oseordigitalisation}
+      POSTGRES_USER: ${DB_USER:-oseor}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-oseor}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-oseor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # API HTTP (waitress/WSGI) : connexions DB persistantes, sert aussi /admin.
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+      RUN_MIGRATIONS: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    ports:
+      - "8000:8000"
+
+  # WebSocket (daphne/ASGI) : notifications temps réel.
+  ws:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+    command: ["daphne", "-b", "0.0.0.0", "-p", "8001", "config.asgi:application"]
+    depends_on:
+      - api
+    ports:
+      - "8001:8001"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+      - ws
+    ports:
+      - "80:80"
+
+volumes:
+  db_data:
+  media_data:
+  static_data:

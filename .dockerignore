@@ -1,0 +1,25 @@
+# Frontend : construit dans son propre conteneur (contexte séparé)
+frontend/
+
+# Environnement Python local
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Git / éditeurs
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# Secrets / données locales
+.env
+*.sqlite3
+/media/
+/staticfiles/
+
+# Divers
+*.log
