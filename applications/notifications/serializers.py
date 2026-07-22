@@ -12,6 +12,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "message",
             "type",
             "lu",
+            "objet_type",
+            "objet_id",
             "date_creation",
             "date_lecture",
         )

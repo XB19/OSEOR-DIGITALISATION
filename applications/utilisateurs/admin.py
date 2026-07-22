@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Utilisateur
+from .models import Utilisateur, ParametreLDAP
 
 
 @admin.register(Utilisateur)
@@ -38,3 +38,16 @@ class UtilisateurAdmin(UserAdmin):
             },
         ),
     )
+
+
+@admin.register(ParametreLDAP)
+class ParametreLDAPAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "server_uri",
+        "domaine",
+        "base_dn",
+        "date_modification",
+    )
+
+    readonly_fields = ("date_modification",)

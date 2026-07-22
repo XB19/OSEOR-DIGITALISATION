@@ -1,0 +1,221 @@
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, shareReplay } from 'rxjs';
+import { environment } from '../../environments/environment';
+import {
+  Salle, Equipement, Filiale, Reservation, DisponibiliteResultat,
+  Audience, Delegation, Utilisateur, NotificationItem, Paginated, ParametresLDAP,
+  ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif,
+} from './models';
+
+/** Service d'accès à l'API REST OSEOR. */
+@Injectable({ providedIn: 'root' })
+export class ApiService {
+  private readonly api = environment.apiUrl;
+
+  // Cache mémoire des données de référence (peu changeantes, souvent relues).
+  // Les données « vivantes » (réservations, notifications, audiences) ne sont
+  // jamais mises en cache pour rester fraîches.
+  private cache = new Map<string, Observable<any>>();
+
+  constructor(private http: HttpClient) {}
+
+  private params(obj: Record<string, any>): HttpParams {
+    let p = new HttpParams();
+    Object.entries(obj).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') p = p.set(k, String(v));
+    });
+    return p;
+  }
+
+  /** Met en cache (partagé) le résultat d'un appel de référence. */
+  private cacheRef<T>(cle: string, source: () => Observable<T>): Observable<T> {
+    if (!this.cache.has(cle)) {
+      this.cache.set(cle, source().pipe(shareReplay(1)));
+    }
+    return this.cache.get(cle) as Observable<T>;
+  }
+
+  /** Invalide une (ou toutes les) entrée(s) de cache, ex. après création d'une salle. */
+  invaliderCache(cle?: string): void {
+    if (cle) this.cache.delete(cle);
+    else this.cache.clear();
+  }
+
+  // ---------- Filiales (référence, mise en cache) ----------
+  filiales(): Observable<Paginated<Filiale>> {
+    return this.cacheRef('filiales', () =>
+      this.http.get<Paginated<Filiale>>(`${this.api}/filiales/`));
+  }
+
+  // ---------- Salles ----------
+  salles(filtres: Record<string, any> = {}): Observable<Paginated<Salle>> {
+    // Seul l'appel de référence (sans filtre) est mis en cache ; les listes
+    // filtrées restent fraîches.
+    const cle = 'salles:' + JSON.stringify(filtres);
+    if (Object.keys(filtres).length === 0) {
+      return this.cacheRef(cle, () =>
+        this.http.get<Paginated<Salle>>(`${this.api}/salles/`));
+    }
+    return this.http.get<Paginated<Salle>>(`${this.api}/salles/`, { params: this.params(filtres) });
+  }
+  salle(id: number): Observable<Salle> {
+    return this.http.get<Salle>(`${this.api}/salles/${id}/`);
+  }
+  creerSalle(s: Partial<Salle> | FormData): Observable<Salle> {
+    return this.muterEtInvalider(this.http.post<Salle>(`${this.api}/salles/`, s));
+  }
+  majSalle(id: number, s: Partial<Salle> | FormData): Observable<Salle> {
+    return this.muterEtInvalider(this.http.put<Salle>(`${this.api}/salles/${id}/`, s));
+  }
+  supprimerSalle(id: number): Observable<void> {
+    return this.muterEtInvalider(this.http.delete<void>(`${this.api}/salles/${id}/`));
+  }
+  equipements(): Observable<Equipement[]> {
+    // Liste 100% statique : cache permanent.
+    return this.cacheRef('equipements', () =>
+      this.http.get<Equipement[]>(`${this.api}/salles/equipements/`));
+  }
+
+  /** Exécute une mutation puis invalide le cache des salles (et filiales). */
+  private muterEtInvalider<T>(obs: Observable<T>): Observable<T> {
+    return new Observable<T>((sub) => obs.subscribe({
+      next: (v) => {
+        // purge les entrées 'salles*' du cache pour forcer un rechargement frais
+        Array.from(this.cache.keys())
+          .filter((k) => k.startsWith('salles'))
+          .forEach((k) => this.cache.delete(k));
+        sub.next(v);
+      },
+      error: (e) => sub.error(e),
+      complete: () => sub.complete(),
+    }));
+  }
+
+  // ---------- Réservations ----------
+  reservations(filtres: Record<string, any> = {}): Observable<Paginated<Reservation>> {
+    return this.http.get<Paginated<Reservation>>(`${this.api}/reservations/`, { params: this.params(filtres) });
+  }
+  creerReservation(r: Partial<Reservation>): Observable<Reservation> {
+    return this.http.post<Reservation>(`${this.api}/reservations/`, r);
+  }
+  reservation(id: number): Observable<Reservation> {
+    return this.http.get<Reservation>(`${this.api}/reservations/${id}/`);
+  }
+  majReservation(id: number, r: Partial<Reservation>): Observable<Reservation> {
+    return this.http.put<Reservation>(`${this.api}/reservations/${id}/`, r);
+  }
+  verifierDisponibilite(q: Record<string, any>): Observable<DisponibiliteResultat> {
+    return this.http.get<DisponibiliteResultat>(
+      `${this.api}/reservations/verifier_disponibilite/`, { params: this.params(q) });
+  }
+  validerReservation(id: number): Observable<Reservation> {
+    return this.http.post<Reservation>(`${this.api}/reservations/${id}/valider/`, {});
+  }
+  refuserReservation(id: number, motif: string): Observable<Reservation> {
+    return this.http.post<Reservation>(`${this.api}/reservations/${id}/refuser/`, { motif });
+  }
+  annulerReservation(id: number, motif: string): Observable<Reservation> {
+    return this.http.post<Reservation>(`${this.api}/reservations/${id}/annuler/`, { motif });
+  }
+  deplacerReservation(id: number, motif: string): Observable<Reservation> {
+    return this.http.post<Reservation>(`${this.api}/reservations/${id}/deplacer/`, { motif });
+  }
+  creerSerie(s: any): Observable<any> {
+    return this.http.post<any>(`${this.api}/series-recurrence/`, s);
+  }
+
+  // ---------- Audiences ----------
+  audiences(filtres: Record<string, any> = {}): Observable<Paginated<Audience>> {
+    return this.http.get<Paginated<Audience>>(`${this.api}/audiences/`, { params: this.params(filtres) });
+  }
+  audience(id: number): Observable<Audience> {
+    return this.http.get<Audience>(`${this.api}/audiences/${id}/`);
+  }
+  creerAudience(a: Partial<Audience>): Observable<Audience> {
+    return this.http.post<Audience>(`${this.api}/audiences/`, a);
+  }
+  majAudience(id: number, a: Partial<Audience>): Observable<Audience> {
+    return this.http.put<Audience>(`${this.api}/audiences/${id}/`, a);
+  }
+  audienceAction(id: number, action: string, body: any = {}): Observable<any> {
+    return this.http.post<any>(`${this.api}/audiences/${id}/${action}/`, body);
+  }
+  delegations(filtres: Record<string, any> = {}): Observable<Paginated<Delegation>> {
+    return this.http.get<Paginated<Delegation>>(`${this.api}/delegations/`, { params: this.params(filtres) });
+  }
+  prendreEnCompteDelegation(id: number): Observable<Delegation> {
+    return this.http.post<Delegation>(`${this.api}/delegations/${id}/prendre_en_compte/`, {});
+  }
+
+  // ---------- Utilisateurs ----------
+  utilisateurs(filtres: Record<string, any> = {}): Observable<Paginated<Utilisateur>> {
+    return this.http.get<Paginated<Utilisateur>>(`${this.api}/utilisateurs/`, { params: this.params(filtres) });
+  }
+  rechercheUtilisateurs(q: string): Observable<Utilisateur[]> {
+    return this.http.get<Utilisateur[]>(`${this.api}/utilisateurs/recherche/`, { params: this.params({ q }) });
+  }
+  creerUtilisateur(u: any): Observable<Utilisateur> {
+    return this.http.post<Utilisateur>(`${this.api}/utilisateurs/`, u);
+  }
+  majUtilisateur(id: number, u: any): Observable<Utilisateur> {
+    return this.http.put<Utilisateur>(`${this.api}/utilisateurs/${id}/`, u);
+  }
+  synchroniserAD(): Observable<{ crees: number; mis_a_jour: number; ignores: number; total_ad: number }> {
+    return this.http.post<any>(`${this.api}/utilisateurs/synchroniser_ad/`, {});
+  }
+
+  // ---------- Notifications ----------
+  notifications(): Observable<Paginated<NotificationItem>> {
+    return this.http.get<Paginated<NotificationItem>>(`${this.api}/notifications/`);
+  }
+  notificationsNonLues(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.api}/notifications/non_lues/`);
+  }
+  marquerNotifLue(id: number): Observable<NotificationItem> {
+    return this.http.post<NotificationItem>(`${this.api}/notifications/${id}/marquer_lue/`, {});
+  }
+  toutMarquerLu(): Observable<any> {
+    return this.http.post<any>(`${this.api}/notifications/tout_marquer_lu/`, {});
+  }
+
+  // ---------- Tableau de bord ----------
+  stats(): Observable<any> {
+    return this.http.get<any>(`${this.api}/tableau-bord/stats/`);
+  }
+
+  // ---------- Journal d'audit (admin) ----------
+  journal(filtres: Record<string, any> = {}): Observable<any> {
+    return this.http.get<any>(`${this.api}/journal/`, { params: this.params({ ordering: '-date_creation', ...filtres }) });
+  }
+
+  // ---------- Administration : Active Directory (LDAP) ----------
+  parametresLDAP(): Observable<ParametresLDAP> {
+    return this.http.get<ParametresLDAP>(`${this.api}/parametres/ldap/`);
+  }
+  majParametresLDAP(p: any): Observable<ParametresLDAP> {
+    return this.http.patch<ParametresLDAP>(`${this.api}/parametres/ldap/`, p);
+  }
+  testerLDAP(p: any = {}): Observable<{ detail: string }> {
+    return this.http.post<{ detail: string }>(`${this.api}/parametres/ldap/tester/`, p);
+  }
+
+  // ---------- Documents administratifs (Moyens Généraux) ----------
+  configurationDocument(type_document: TypeDocumentAdministratif): Observable<ConfigurationDocument> {
+    return this.http.get<ConfigurationDocument>(
+      `${this.api}/documents/configuration/`, { params: this.params({ type_document }) });
+  }
+  documents(filtres: Record<string, any> = {}): Observable<Paginated<DocumentAdministratif>> {
+    return this.http.get<Paginated<DocumentAdministratif>>(
+      `${this.api}/documents/`, { params: this.params({ ordering: '-date_creation', page_size: 100, ...filtres }) });
+  }
+  document(id: number): Observable<DocumentAdministratif> {
+    return this.http.get<DocumentAdministratif>(`${this.api}/documents/${id}/`);
+  }
+  creerDocument(d: any): Observable<DocumentAdministratif> {
+    return this.http.post<DocumentAdministratif>(`${this.api}/documents/`, d);
+  }
+  viserDocument(id: number, decision: 'VALIDE' | 'REFUSE', commentaire = ''): Observable<DocumentAdministratif> {
+    return this.http.post<DocumentAdministratif>(`${this.api}/documents/${id}/viser/`, { decision, commentaire });
+  }
+}

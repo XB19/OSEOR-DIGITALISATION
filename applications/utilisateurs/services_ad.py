@@ -4,7 +4,9 @@ Synchronisation des utilisateurs depuis l'Active Directory local via LDAP.
 Utilise un compte de service (bind DN) pour lister tous les utilisateurs
 sans qu'un utilisateur soit connecté (équivalent du client credentials flow Azure).
 
-.env requis :
+Configuration : saisie par l'administrateur depuis l'application
+(Administration > Active Directory, modèle ParametreLDAP). À défaut, on
+retombe sur les variables .env historiques :
     LDAP_SERVER_URI    = ldap://192.168.1.10
     LDAP_BIND_DN       = CN=svcOseor,OU=Services,DC=oseor,DC=local
     LDAP_BIND_PASSWORD = motdepasse
@@ -22,16 +24,42 @@ from applications.utilisateurs.ldap_backend import (
 User = get_user_model()
 
 
+def _config_ldap() -> tuple[str, str, str, str]:
+    """
+    Renvoie (server_uri, bind_dn, bind_password, base_dn) : priorité à la
+    configuration enregistrée en base par l'administrateur, sinon repli
+    sur les variables .env.
+    """
+    from applications.utilisateurs.models import ParametreLDAP
+
+    parametres = ParametreLDAP.charger()
+    if parametres.configure:
+        return (
+            parametres.server_uri,
+            parametres.bind_dn,
+            parametres.bind_password,
+            parametres.base_dn,
+        )
+    return (
+        getattr(settings, 'LDAP_SERVER_URI', ''),
+        getattr(settings, 'LDAP_BIND_DN', ''),
+        getattr(settings, 'LDAP_BIND_PASSWORD', ''),
+        getattr(settings, 'LDAP_BASE_DN', ''),
+    )
+
+
 def lister_utilisateurs_ad() -> list:
     """
     Retourne toutes les entrées person actives qui ont un email,
-    via le compte de service configuré dans .env.
+    via le compte de service configuré (base ou .env).
     """
-    server = Server(settings.LDAP_SERVER_URI, get_info=ALL, connect_timeout=5)
+    server_uri, bind_dn, bind_password, base_dn = _config_ldap()
+
+    server = Server(server_uri, get_info=ALL, connect_timeout=5)
     conn = Connection(
         server,
-        user=settings.LDAP_BIND_DN,
-        password=settings.LDAP_BIND_PASSWORD,
+        user=bind_dn,
+        password=bind_password,
         authentication=SIMPLE,
         auto_bind=True,
         receive_timeout=30,
@@ -39,7 +67,7 @@ def lister_utilisateurs_ad() -> list:
 
     # Filtre : personnes avec un email, excluant les comptes désactivés
     conn.search(
-        settings.LDAP_BASE_DN,
+        base_dn,
         '(&(objectClass=person)(mail=*)'
         '(!(userAccountControl:1.2.840.113556.1.4.803:=2)))',
         search_scope=SUBTREE,
@@ -53,6 +81,34 @@ def lister_utilisateurs_ad() -> list:
     entries = list(conn.entries)
     conn.unbind()
     return entries
+
+
+def tester_connexion_ad(server_uri: str, bind_dn: str, bind_password: str, base_dn: str) -> int:
+    """
+    Tente un bind + une recherche minimale avec les valeurs fournies (utilisé
+    par le bouton "Tester la connexion", avant enregistrement).
+    Renvoie le nombre d'entrées trouvées, ou lève une exception explicite.
+    """
+    server = Server(server_uri, get_info=ALL, connect_timeout=5)
+    conn = Connection(
+        server,
+        user=bind_dn,
+        password=bind_password,
+        authentication=SIMPLE,
+        auto_bind=True,
+        receive_timeout=10,
+    )
+    conn.search(
+        base_dn,
+        '(objectClass=person)',
+        search_scope=SUBTREE,
+        attributes=['cn'],
+        paged_size=1,
+        size_limit=1,
+    )
+    nb = len(conn.entries)
+    conn.unbind()
+    return nb
 
 
 def synchroniser_utilisateur_ad(entry) -> str:

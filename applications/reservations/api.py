@@ -147,6 +147,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
                     message += f" Motif : {motif_modif}"
                 envoyer_notification(
                     reservation.demandeur, "Réservation modifiée", message, "WARNING",
+                    objet=reservation,
                 )
                 enregistrer_action(
                     u, "RESERVATION_MODIFIEE",
@@ -307,6 +308,7 @@ class ReservationViewSet(viewsets.ModelViewSet):
             f"libéré par le secrétariat. Motif : {motif}. "
             f"Merci de reprogrammer sur un autre créneau.",
             "WARNING",
+            objet=reservation,
         )
         enregistrer_action(
             request.user, "RESERVATION_DEPLACEE",

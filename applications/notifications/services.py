@@ -4,11 +4,16 @@ from channels.layers import get_channel_layer
 from .models import Notification
 
 
-def envoyer_notification(utilisateur, titre, message, type_notification="INFO"):
+def envoyer_notification(utilisateur, titre, message, type_notification="INFO", objet=None):
     """
     Crée une notification in-app et la pousse en temps réel via WebSocket
     (EF-18 / RG-12). L'envoi e-mail est géré en parallèle par le caller
     ou un signal (backend console en dev).
+
+    - objet : instance de modèle concernée (Reservation, Audience,
+      Document…), optionnelle — permet au clic sur la notification
+      d'ouvrir directement l'élément à traiter (même pattern que
+      `enregistrer_action` côté journal d'audit).
     """
 
     notification = Notification.objects.create(
@@ -16,6 +21,8 @@ def envoyer_notification(utilisateur, titre, message, type_notification="INFO"):
         titre=titre,
         message=message,
         type=type_notification,
+        objet_type=objet.__class__.__name__ if objet is not None else "",
+        objet_id=getattr(objet, "pk", None) if objet is not None else None,
     )
 
     _pousser_temps_reel(notification)
@@ -54,6 +61,8 @@ def _pousser_temps_reel(notification):
         "message": notification.message,
         "type": notification.type,
         "lu": notification.lu,
+        "objet_type": notification.objet_type,
+        "objet_id": notification.objet_id,
         "date_creation": notification.date_creation.isoformat(),
     }
     try:

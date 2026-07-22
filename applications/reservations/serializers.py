@@ -146,6 +146,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                 f"{' — ' + reservation.motif if reservation.motif else ''} "
                 f"en salle {reservation.salle.nom}, le {creneau}.",
                 "INFO",
+                objet=reservation,
             )
 
     def _notifier_secretariat(self, reservation):
@@ -166,6 +167,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                 f"le {reservation.date_reunion} ({reservation.heure_debut:%H:%M}"
                 f"-{reservation.heure_fin:%H:%M})",
                 "INFO",
+                objet=reservation,
             )
 
     def update(self, instance, validated_data):

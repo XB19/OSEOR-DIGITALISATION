@@ -3,7 +3,7 @@
     "model": "filiales.filiale",
     "pk": 1,
     "fields": {
-      "nom": "OSEOR Siège",
+      "nom": "OSEOR SA",
       "code": "OSEOR",
       "description": "Siège social du groupe OSEOR",
       "email": "siege@oseor.com",
@@ -18,7 +18,7 @@
     "model": "filiales.filiale",
     "pk": 2,
     "fields": {
-      "nom": "KAPI",
+      "nom": "KAPI Consult",
       "code": "KAPI",
       "description": "Filiale KAPI du groupe OSEOR",
       "email": "contact@kapi.com",
@@ -33,11 +33,41 @@
     "model": "filiales.filiale",
     "pk": 3,
     "fields": {
-      "nom": "BONICI",
-      "code": "BONICI",
-      "description": "Filiale BONICI du groupe OSEOR",
-      "email": "contact@bonici.com",
+      "nom": "ZIH",
+      "code": "ZIH",
+      "description": "Filiale ZIH du groupe OSEOR",
+      "email": "contact@zih.com",
       "telephone": "+228 22 00 00 03",
+      "adresse": "Lomé, Togo",
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "filiales.filiale",
+    "pk": 4,
+    "fields": {
+      "nom": "DIWA INTERNATIONAL",
+      "code": "DIWA",
+      "description": "Filiale DIWA INTERNATIONAL du groupe OSEOR",
+      "email": "contact@diwa-international.com",
+      "telephone": "+228 22 00 00 04",
+      "adresse": "Lomé, Togo",
+      "active": true,
+      "date_creation": "2025-01-01T08:00:00Z",
+      "date_modification": "2025-01-01T08:00:00Z"
+    }
+  },
+  {
+    "model": "filiales.filiale",
+    "pk": 5,
+    "fields": {
+      "nom": "AROBASE",
+      "code": "AROBASE",
+      "description": "Filiale AROBASE du groupe OSEOR",
+      "email": "contact@arobase.com",
+      "telephone": "+228 22 00 00 05",
       "adresse": "Lomé, Togo",
       "active": true,
       "date_creation": "2025-01-01T08:00:00Z",
@@ -71,6 +101,28 @@
     "pk": 3,
     "fields": {
       "filiale": 3,
+      "delai_min_reservation": 30,
+      "duree_max_reservation": 480,
+      "nb_max_reservations_actives": 5,
+      "delai_annulation": 60
+    }
+  },
+  {
+    "model": "filiales.parametrefiliale",
+    "pk": 4,
+    "fields": {
+      "filiale": 4,
+      "delai_min_reservation": 30,
+      "duree_max_reservation": 480,
+      "nb_max_reservations_actives": 5,
+      "delai_annulation": 60
+    }
+  },
+  {
+    "model": "filiales.parametrefiliale",
+    "pk": 5,
+    "fields": {
+      "filiale": 5,
       "delai_min_reservation": 30,
       "duree_max_reservation": 480,
       "nb_max_reservations_actives": 5,

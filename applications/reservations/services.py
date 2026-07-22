@@ -113,7 +113,8 @@ def creer_reservation(
             secretaire,
             "Nouvelle demande de réservation",
             f"Salle {salle.nom} le {date_reunion}",
-            "INFO"
+            "INFO",
+            objet=reservation,
         )
 
     return reservation
@@ -133,7 +134,8 @@ def valider_reservation(reservation, secretaire):
         reservation.demandeur,
         "Réservation validée",
         f"La salle {reservation.salle.nom} a été validée.",
-        "SUCCESS"
+        "SUCCESS",
+        objet=reservation,
     )
 
     return reservation
@@ -152,7 +154,8 @@ def refuser_reservation(reservation, admin, motif):
         reservation.demandeur,
         "Réservation refusée",
         f"Motif : {motif}",
-        "ERROR"
+        "ERROR",
+        objet=reservation,
     )
 
     return reservation
@@ -171,7 +174,8 @@ def annuler_reservation(reservation, utilisateur, motif):
         reservation.demandeur,
         "Réservation annulée",
         f"Motif : {motif}",
-        "WARNING"
+        "WARNING",
+        objet=reservation,
     )
 
     return reservation

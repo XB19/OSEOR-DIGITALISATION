@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>SMART HUB</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <!-- Typographie : Poppins (titres) + Open Sans (corps) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ---- Splash de chargement pro (avant bootstrap Angular) ---- */
+    #splash-oseor {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1.6rem;
+      background: radial-gradient(120% 120% at 50% 0%, #1e40af 0%, #1e3a8a 55%, #16306b 100%);
+      font-family: 'Poppins', system-ui, sans-serif;
+      transition: opacity .5s ease, visibility .5s ease;
+    }
+    #splash-oseor.parti { opacity: 0; visibility: hidden; }
+    .splash-marque {
+      color: #fff; font-weight: 700; font-size: 2rem; letter-spacing: .02em;
+      display: flex; flex-direction: column; align-items: center; line-height: 1;
+      animation: splashUp .7s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .splash-marque small {
+      font-size: .72rem; font-weight: 400; letter-spacing: .35em;
+      color: #93c5fd; margin-top: .5rem; text-transform: uppercase;
+    }
+    .splash-ring {
+      width: 46px; height: 46px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.18); border-top-color: #f97316;
+      animation: splashSpin .9s linear infinite;
+    }
+    .splash-sous { color: #bfdbfe; font-size: .82rem; letter-spacing: .04em;
+      font-family: 'Open Sans', sans-serif; animation: splashUp .7s .15s both; }
+    @keyframes splashSpin { to { transform: rotate(360deg); } }
+    @keyframes splashUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-marque, .splash-sous { animation: none; }
+      .splash-ring { animation-duration: 2s; }
+    }
+  </style>
+</head>
+<body>
+  <app-root></app-root>
+
+  <div id="splash-oseor">
+    <div class="splash-marque">SMART<small>HUB</small></div>
+    <div class="splash-ring"></div>
+    <div class="splash-sous">Chargement de votre espace…</div>
+  </div>
+
+  <script>
+    // Retire le splash dès que l'app Angular a rendu son contenu.
+    (function () {
+      var splash = document.getElementById('splash-oseor');
+      function partir() {
+        if (!splash) return;
+        splash.classList.add('parti');
+        setTimeout(function () { splash && splash.remove(); }, 600);
+      }
+      var obs = new MutationObserver(function () {
+        var root = document.querySelector('app-root');
+        if (root && root.children.length > 0) { obs.disconnect(); setTimeout(partir, 350); }
+      });
+      obs.observe(document.querySelector('app-root'), { childList: true, subtree: true });
+      // garde-fou : retire au plus tard après 6s
+      setTimeout(partir, 6000);
+    })();
+  </script>
+</body>
+</html>

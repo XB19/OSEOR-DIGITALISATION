@@ -1,0 +1,115 @@
+import { Component, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
+import { IconComponent } from '../../shared/icon.component';
+
+@Component({
+  selector: 'app-login',
+  imports: [CommonModule, FormsModule, IconComponent],
+  template: `
+  <div class="ecran">
+    <div class="deco deco-1"></div>
+    <div class="deco deco-2"></div>
+
+    <div class="panneau-gauche">
+      <div class="marque-xl">
+        <span class="mk">S</span>
+        <div>SMART<small>HUB</small></div>
+      </div>
+      <h2>Réservez vos salles<br>en toute simplicité.</h2>
+      <p>Plateforme centralisée de réservation de salles et de gestion des audiences du groupe OSEOR.</p>
+      <ul class="atouts">
+        <li><app-icon name="calendar" [size]="18"/> Vue calendrier des disponibilités</li>
+        <li><app-icon name="checkCircle" [size]="18"/> Validation et anti-chevauchement</li>
+        <li><app-icon name="bell" [size]="18"/> Notifications en temps réel</li>
+      </ul>
+    </div>
+
+    <div class="carte-login anim-entree">
+      <h2>Connexion</h2>
+      <p class="sous">Accédez à votre espace de travail</p>
+
+      @if (erreur()) {
+        <div class="alerte err"><app-icon name="close" [size]="16"/>{{ erreur() }}</div>
+      }
+
+      <form (ngSubmit)="seConnecter()">
+        <div class="champ">
+          <label>Identifiant</label>
+          <input [(ngModel)]="username" name="username" autocomplete="username" required
+                 placeholder="prenom.nom" />
+        </div>
+        <div class="champ">
+          <label>Mot de passe</label>
+          <input type="password" [(ngModel)]="password" name="password"
+                 autocomplete="current-password" required placeholder="••••••••" />
+        </div>
+        <button class="btn cta" style="width:100%" [disabled]="chargement()">
+          @if (chargement()) { <span class="spinner"></span> Connexion… }
+          @else { Se connecter }
+        </button>
+      </form>
+    </div>
+  </div>
+  `,
+  styles: [`
+    .ecran { min-height: 100vh; display: grid; grid-template-columns: 1fr 420px;
+      background: radial-gradient(120% 120% at 0% 0%, #1e40af 0%, #1e3a8a 55%, #16306b 100%);
+      position: relative; overflow: hidden; }
+    .deco { position: absolute; border-radius: 50%; filter: blur(8px); opacity: .25; }
+    .deco-1 { width: 420px; height: 420px; background: #3b82f6; top: -120px; right: 30%; }
+    .deco-2 { width: 320px; height: 320px; background: #f97316; bottom: -100px; right: 24%; opacity: .18; }
+    .panneau-gauche { color: #fff; padding: 4rem; display: flex; flex-direction: column;
+      justify-content: center; max-width: 560px; z-index: 1; }
+    .marque-xl { display: flex; align-items: center; gap: .8rem; margin-bottom: 2.5rem; }
+    .marque-xl .mk { width: 46px; height: 46px; border-radius: 12px; background: var(--accent);
+      display: flex; align-items: center; justify-content: center; font-family: var(--police-titre);
+      font-weight: 700; font-size: 1.5rem; box-shadow: 0 6px 18px rgba(249,115,22,.45); }
+    .marque-xl > div { font-family: var(--police-titre); font-weight: 700; font-size: 1.4rem;
+      display: flex; flex-direction: column; line-height: 1; }
+    .marque-xl small { font-size: .66rem; font-weight: 400; opacity: .7; letter-spacing: .2em; }
+    .panneau-gauche h2 { color: #fff; font-size: 2.4rem; line-height: 1.15; margin-bottom: 1rem; }
+    .panneau-gauche p { color: #c7d7f5; font-size: 1rem; max-width: 420px; }
+    .atouts { list-style: none; padding: 0; margin: 2rem 0 0; display: flex; flex-direction: column; gap: .9rem; }
+    .atouts li { display: flex; align-items: center; gap: .7rem; color: #dbeafe; font-size: .95rem; }
+    .atouts app-icon { color: var(--accent); }
+
+    .carte-login { background: #fff; padding: 2.6rem 2.2rem; z-index: 1;
+      display: flex; flex-direction: column; justify-content: center; box-shadow: var(--ombre-lg); }
+    .carte-login h2 { font-size: 1.6rem; }
+    .sous { color: var(--txt-2); margin: -.3rem 0 1.6rem; font-size: .9rem; }
+
+    @media (max-width: 900px) {
+      .ecran { grid-template-columns: 1fr; }
+      .panneau-gauche { display: none; }
+      .carte-login { min-height: 100vh; }
+    }
+  `],
+})
+export class LoginComponent {
+  username = '';
+  password = '';
+  chargement = signal(false);
+  erreur = signal('');
+
+  constructor(private auth: AuthService, private router: Router) {}
+
+  seConnecter(): void {
+    this.erreur.set('');
+    this.chargement.set(true);
+    this.auth.connexion(this.username, this.password).subscribe({
+      next: () => {
+        this.auth.chargerProfil().subscribe({
+          next: () => { this.chargement.set(false); this.router.navigate(['/tableau-de-bord']); },
+          error: () => { this.chargement.set(false); this.router.navigate(['/tableau-de-bord']); },
+        });
+      },
+      error: () => {
+        this.chargement.set(false);
+        this.erreur.set('Identifiant ou mot de passe incorrect.');
+      },
+    });
+  }
+}

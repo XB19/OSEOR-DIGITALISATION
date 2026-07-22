@@ -2,13 +2,16 @@ from django.contrib.auth import get_user_model
 from rest_framework import viewsets, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from config.permissions import EstAdministrateur
 from applications.journalisation.services import enregistrer_action
+from .models import ParametreLDAP
 from .serializers import (
     UtilisateurSerializer,
     UtilisateurEcritureSerializer,
     MoiSerializer,
+    ParametreLDAPSerializer,
 )
 
 User = get_user_model()
@@ -56,15 +59,15 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     def synchroniser_ad(self, request):
         """
         Synchronise les utilisateurs depuis l'Active Directory local via LDAP.
-        Nécessite LDAP_SERVER_URI / LDAP_BIND_DN / LDAP_BIND_PASSWORD dans .env.
+        Configuration via Administration > Active Directory (ou, à défaut, .env).
         """
         from django.conf import settings
         from .services_ad import lister_utilisateurs_ad, synchroniser_utilisateur_ad
 
-        if not getattr(settings, 'LDAP_SERVER_URI', ''):
+        if not ParametreLDAP.charger().configure and not getattr(settings, 'LDAP_SERVER_URI', ''):
             return Response(
-                {'detail': 'Active Directory non configuré dans .env '
-                           '(LDAP_SERVER_URI, LDAP_BIND_DN, LDAP_BIND_PASSWORD, LDAP_BASE_DN).'},
+                {'detail': "Active Directory non configuré. Rendez-vous dans "
+                           "Administration > Active Directory pour le configurer."},
                 status=400,
             )
 
@@ -125,3 +128,56 @@ class MoiView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ParametreLDAPView(generics.RetrieveUpdateAPIView):
+    """
+    Configuration Active Directory (LDAP) — lecture/écriture réservée à
+    l'administrateur. Table à une seule ligne (singleton).
+    """
+
+    serializer_class = ParametreLDAPSerializer
+    permission_classes = [EstAdministrateur]
+
+    def get_object(self):
+        return ParametreLDAP.charger()
+
+    def perform_update(self, serializer):
+        parametres = serializer.save()
+        enregistrer_action(
+            self.request.user, 'PARAMETRES_AD_MODIFIES',
+            'Configuration Active Directory (LDAP)', objet=parametres,
+        )
+
+
+class TesterConnexionLDAPView(APIView):
+    """
+    Teste une connexion LDAP avec les valeurs saisies (ou déjà enregistrées
+    si un champ est laissé vide), sans lancer de synchronisation.
+    """
+
+    permission_classes = [EstAdministrateur]
+
+    def post(self, request):
+        from .services_ad import tester_connexion_ad
+
+        parametres = ParametreLDAP.charger()
+        donnees = request.data
+        server_uri = donnees.get('server_uri') or parametres.server_uri
+        base_dn = donnees.get('base_dn') or parametres.base_dn
+        bind_dn = donnees.get('bind_dn') or parametres.bind_dn
+        bind_password = donnees.get('bind_password') or parametres.bind_password
+
+        if not (server_uri and base_dn and bind_dn and bind_password):
+            return Response(
+                {'detail': 'Renseignez le serveur, la base DN, le compte de service '
+                           'et son mot de passe avant de tester.'},
+                status=400,
+            )
+
+        try:
+            nb = tester_connexion_ad(server_uri, bind_dn, bind_password, base_dn)
+        except Exception as exc:
+            return Response({'detail': f'Échec de connexion : {exc}'}, status=502)
+
+        return Response({'detail': f'Connexion réussie ({nb} entrée(s) trouvée(s) sur ce filtre de test).'})

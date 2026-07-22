@@ -50,6 +50,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
             "Nouvelle demande d'audience",
             f"Audience de {audience.nom_complet} — {audience.objet_visite[:80]}",
             "INFO",
+            objet=audience,
         )
         return Response(AudienceSerializer(audience).data)
 
@@ -68,6 +69,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
             "Audience renvoyée pour complément",
             commentaire or "Le DG demande des précisions.",
             "WARNING",
+            objet=audience,
         )
         return Response(AudienceSerializer(audience).data)
 
@@ -128,6 +130,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
             "Audience validée par le DG",
             f"L'audience de {audience.nom_complet} est validée. Confirmez le rendez-vous.",
             "SUCCESS",
+            objet=audience,
         )
         enregistrer_action(
             request.user, "AUDIENCE_VALIDEE_DG",
@@ -188,6 +191,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
             f"L'audience de {audience.nom_complet} a été annulée."
             + (f" Motif : {motif}" if motif else ""),
             "WARNING",
+            objet=audience,
         )
         enregistrer_action(
             u, "AUDIENCE_ANNULEE",
@@ -224,6 +228,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
                     "Délégation d'audience",
                     commentaire or f"Vous êtes délégué pour l'audience de {audience.nom_complet}.",
                     "INFO",
+                    objet=audience,
                 )
         if creees:
             enregistrer_action(
@@ -246,6 +251,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
             "Audience confirmée",
             f"L'audience de {audience.nom_complet} est confirmée.",
             "SUCCESS",
+            objet=audience,
         )
         for d in audience.delegations.all():
             envoyer_notification(
@@ -253,6 +259,7 @@ class AudienceViewSet(viewsets.ModelViewSet):
                 "Audience confirmée",
                 f"L'audience de {audience.nom_complet} est confirmée.",
                 "SUCCESS",
+                objet=audience,
             )
         enregistrer_action(
             request.user, "AUDIENCE_CONFIRMEE",
@@ -291,5 +298,6 @@ class DelegationViewSet(viewsets.ModelViewSet):
             f"{request.user.nom_complet} a pris connaissance de la délégation "
             f"pour l'audience de {delegation.audience.nom_complet}.",
             "SUCCESS",
+            objet=delegation.audience,
         )
         return Response(DelegationSerializer(delegation).data)

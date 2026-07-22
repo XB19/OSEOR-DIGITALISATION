@@ -55,6 +55,21 @@ class Notification(models.Model):
         blank=True
     )
 
+    # Lien générique vers l'objet concerné (ex. Reservation, Audience,
+    # Document), pour permettre au clic sur la notification d'ouvrir
+    # directement l'élément à traiter. Même pattern que JournalAction.
+    objet_type = models.CharField(
+        verbose_name="Type d'objet",
+        max_length=60,
+        blank=True
+    )
+
+    objet_id = models.PositiveIntegerField(
+        verbose_name="Identifiant de l'objet",
+        null=True,
+        blank=True
+    )
+
     class Meta:
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"

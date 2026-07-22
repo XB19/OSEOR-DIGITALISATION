@@ -7,7 +7,9 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from applications.utilisateurs.api import UtilisateurViewSet, MoiView
+from applications.utilisateurs.api import (
+    UtilisateurViewSet, MoiView, ParametreLDAPView, TesterConnexionLDAPView,
+)
 from applications.filiales.api import FilialeViewSet
 from applications.salles.api import SalleViewSet
 from applications.reservations.api import ReservationViewSet, SerieRecurrenceViewSet
@@ -15,6 +17,7 @@ from applications.audiences.api import AudienceViewSet, DelegationViewSet
 from applications.notifications.api import NotificationViewSet
 from applications.journalisation.api import JournalActionViewSet
 from applications.tableau_bord.api import StatistiquesView
+from applications.documents.api import DocumentViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -26,12 +29,16 @@ router.register("audiences", AudienceViewSet, basename="audience")
 router.register("delegations", DelegationViewSet, basename="delegation")
 router.register("notifications", NotificationViewSet, basename="notification")
 router.register("journal", JournalActionViewSet, basename="journal")
+router.register("documents", DocumentViewSet, basename="document")
 
 urlpatterns = [
     # Authentification JWT (dev)
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/me/", MoiView.as_view(), name="auth_me"),
+
+    path("parametres/ldap/", ParametreLDAPView.as_view(), name="parametres_ldap"),
+    path("parametres/ldap/tester/", TesterConnexionLDAPView.as_view(), name="parametres_ldap_tester"),
 
     path("tableau-bord/stats/", StatistiquesView.as_view(), name="tableau_bord_stats"),
 

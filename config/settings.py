@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'channels',
 
     'applications.tableau_bord',
+    'applications.documents',
     'applications.notifications',
     'applications.reservations',
     'applications.audiences',
