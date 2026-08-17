@@ -38,7 +38,7 @@ services:
 
   # API HTTP (waitress/WSGI) : connexions DB persistantes, sert aussi /admin.
   api:
-    build: .
+    build: ./backend
     restart: unless-stopped
     environment:
       <<: *django-env
@@ -56,7 +56,7 @@ services:
 
   # WebSocket (daphne/ASGI) : notifications temps réel.
   ws:
-    build: .
+    build: ./backend
     restart: unless-stopped
     environment:
       <<: *django-env

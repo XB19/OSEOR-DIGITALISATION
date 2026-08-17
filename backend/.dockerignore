@@ -1,6 +1,3 @@
-# Frontend : construit dans son propre conteneur (contexte séparé)
-frontend/
-
 # Environnement Python local
 venv/
 env/
