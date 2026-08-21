@@ -10,7 +10,7 @@ from rest_framework_simplejwt.views import (
 from applications.utilisateurs.api import (
     UtilisateurViewSet, MoiView, ParametreLDAPView, TesterConnexionLDAPView,
 )
-from applications.filiales.api import FilialeViewSet
+from applications.filiales.api import FilialeViewSet, ServiceViewSet
 from applications.salles.api import SalleViewSet
 from applications.reservations.api import ReservationViewSet, SerieRecurrenceViewSet
 from applications.audiences.api import AudienceViewSet, DelegationViewSet
@@ -22,6 +22,7 @@ from applications.documents.api import DocumentViewSet
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
 router.register("filiales", FilialeViewSet, basename="filiale")
+router.register("services", ServiceViewSet, basename="service")
 router.register("salles", SalleViewSet, basename="salle")
 router.register("reservations", ReservationViewSet, basename="reservation")
 router.register("series-recurrence", SerieRecurrenceViewSet, basename="serie")

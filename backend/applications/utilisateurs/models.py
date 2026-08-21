@@ -74,6 +74,25 @@ class Utilisateur(AbstractUser):
         blank=True
     )
 
+    service = models.ForeignKey(
+        "filiales.Service",
+        verbose_name="Service",
+        on_delete=models.SET_NULL,
+        related_name="membres",
+        null=True,
+        blank=True
+    )
+
+    responsable_hierarchique = models.ForeignKey(
+        "self",
+        verbose_name="Responsable hiérarchique",
+        on_delete=models.SET_NULL,
+        related_name="subordonnes",
+        null=True,
+        blank=True,
+        help_text="Valide en premier les demandes de cet utilisateur (congés…)."
+    )
+
     telephone = models.CharField(
         verbose_name="Téléphone",
         max_length=30,
@@ -163,6 +182,91 @@ class Utilisateur(AbstractUser):
     @property
     def est_employe(self):
         return self.role == self.Role.EMPLOYE
+
+    # -----------------------------------------------------------------
+    # Hiérarchie
+    # -----------------------------------------------------------------
+
+    # Garde-fou : borne la remontée de la hiérarchie même si un cycle a été
+    # introduit hors validation (import LDAP, chargement de fixtures, SQL
+    # direct — aucun de ces chemins n'appelle `clean()`).
+    PROFONDEUR_MAX_HIERARCHIE = 20
+
+    def chaine_responsables(self):
+        """
+        Responsables successifs, du plus proche au plus lointain.
+        S'arrête au premier cycle rencontré plutôt que de boucler.
+        """
+        chaine = []
+        vus = {self.pk}
+        courant = self.responsable_hierarchique
+
+        while courant is not None and len(chaine) < self.PROFONDEUR_MAX_HIERARCHIE:
+            if courant.pk in vus:
+                break
+            chaine.append(courant)
+            vus.add(courant.pk)
+            courant = courant.responsable_hierarchique
+
+        return chaine
+
+    def est_responsable_de(self, autre):
+        """
+        True si `self` est, directement ou non, un responsable de `autre`.
+        Un utilisateur n'est jamais son propre responsable.
+        """
+        if autre is None or autre.pk == self.pk:
+            return False
+        return any(r.pk == self.pk for r in autre.chaine_responsables())
+
+    @property
+    def valideur_conge(self):
+        """
+        Qui valide en premier une demande de congé de cet utilisateur :
+        son responsable direct, sinon le chef de son service (sauf s'il
+        s'agit de lui-même), sinon personne — les RH prennent alors le relais.
+        """
+        if self.responsable_hierarchique_id:
+            return self.responsable_hierarchique
+
+        if self.service_id and self.service.chef_id:
+            if self.service.chef_id != self.pk:
+                return self.service.chef
+
+        return None
+
+    def clean(self):
+        """Interdit qu'un utilisateur soit son propre responsable, direct ou non."""
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+
+        if not self.responsable_hierarchique_id:
+            return
+
+        if self.responsable_hierarchique_id == self.pk:
+            raise ValidationError({
+                "responsable_hierarchique": "Un utilisateur ne peut pas être son "
+                                            "propre responsable.",
+            })
+
+        # Remonter depuis le responsable désigné : si l'on retombe sur
+        # `self`, le rattachement crée un cycle.
+        courant = self.responsable_hierarchique
+        vus = set()
+        profondeur = 0
+
+        while courant is not None and profondeur < self.PROFONDEUR_MAX_HIERARCHIE:
+            if courant.pk == self.pk:
+                raise ValidationError({
+                    "responsable_hierarchique": "Ce rattachement crée un cycle dans "
+                                                "la hiérarchie.",
+                })
+            if courant.pk in vus:
+                break
+            vus.add(courant.pk)
+            courant = courant.responsable_hierarchique
+            profondeur += 1
 
 
 def _cle_chiffrement() -> bytes:

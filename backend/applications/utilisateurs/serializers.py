@@ -12,6 +12,10 @@ class UtilisateurSerializer(serializers.ModelSerializer):
     nom_complet = serializers.CharField(read_only=True)
     role_libelle = serializers.CharField(source="get_role_display", read_only=True)
     filiale_nom = serializers.CharField(source="filiale.nom", read_only=True, default=None)
+    service_nom = serializers.CharField(source="service.nom", read_only=True, default=None)
+    responsable_nom = serializers.CharField(
+        source="responsable_hierarchique.nom_complet", read_only=True, default=None,
+    )
     source_auth = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,6 +32,10 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             "role_libelle",
             "filiale",
             "filiale_nom",
+            "service",
+            "service_nom",
+            "responsable_hierarchique",
+            "responsable_nom",
             "actif",
             "is_active",
             "source_auth",
@@ -60,6 +68,8 @@ class UtilisateurEcritureSerializer(serializers.ModelSerializer):
             "telephone",
             "role",
             "filiale",
+            "service",
+            "responsable_hierarchique",
             "actif",
             "password",
         )
