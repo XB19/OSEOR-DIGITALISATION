@@ -6,6 +6,8 @@ Tests de caractérisation écrits AVANT la centralisation des contrôles de rôl
 le passage à `config/permissions.py` soit prouvé iso-fonctionnel.
 """
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
@@ -212,6 +214,59 @@ class ChaineDeVisasTests(BaseDocuments, APITestCase):
         self.assertEqual(derniere["utilisateur_id"], self.comptable.pk)
         self.assertEqual(derniere["decision"], "VALIDE")
         self.assertEqual(derniere["commentaire"], "OK pour moi")
+
+
+class AtomiciteDuVisaTests(BaseDocuments, APITestCase):
+    """
+    `viser` fait une lecture-modification-écriture sur `historique_visas`
+    (JSONField) : sans transaction ni verrou, deux visas simultanés
+    s'écrasaient — le second réécrivait la liste lue avant le premier.
+
+    Le verrou `select_for_update` lui-même n'est pas démontrable ici :
+    SQLite, utilisé pour les tests, l'ignore silencieusement. Ce qui est
+    vérifié, c'est la frontière transactionnelle — ce qui est annulé
+    ensemble, et ce qui ne doit surtout pas l'être.
+    """
+
+    def setUp(self):
+        self.creer_donnees()
+        self.document = self.creer_document()
+
+    def viser(self, utilisateur, decision="VALIDE"):
+        self.client.force_authenticate(utilisateur)
+        return self.client.post(
+            f"/api/documents/{self.document.pk}/viser/",
+            {"decision": decision, "commentaire": ""}, format="json",
+        )
+
+    def test_echec_du_journal_annule_le_visa(self):
+        """Un visa sans trace d'audit ne doit pas subsister."""
+        with mock.patch(
+            "applications.documents.api.enregistrer_action",
+            side_effect=RuntimeError("journal indisponible"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.viser(self.comptable)
+
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.historique_visas, [])
+        self.assertEqual(self.document.etape_visa_courante, 1)
+
+    def test_echec_de_notification_conserve_le_visa(self):
+        """
+        À l'inverse : les notifications sont hors transaction. Une panne SMTP
+        ou Redis ne doit jamais faire perdre une signature déjà accordée.
+        """
+        with mock.patch(
+            "applications.documents.api.notifier_decision_finale",
+            side_effect=RuntimeError("SMTP injoignable"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.viser(self.comptable, decision="REFUSE")
+
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.statut, Document.Statut.REFUSE)
+        self.assertEqual(len(self.document.historique_visas), 1)
 
 
 class PeutViserTests(BaseDocuments, APITestCase):
