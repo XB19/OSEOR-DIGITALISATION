@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from applications.journalisation.services import enregistrer_action
+from config.permissions import est_direction, restreindre_a_la_filiale
 from .models import Document, ConfigurationDocument
 from .services import notifier_etape_courante, notifier_decision_finale
 from .serializers import (
@@ -28,10 +29,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Document.objects.select_related("filiale", "demandeur")
-        u = self.request.user
-        if u.role in ("ADMINISTRATEUR", "DIRECTEUR"):
-            return qs
-        return qs.filter(filiale=u.filiale)
+        return restreindre_a_la_filiale(qs, self.request.user)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -74,7 +72,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         etape_config = config.visas[etape]
         u = request.user
         role_requis = etape_config.get("role")
-        autorise = u.role in ("ADMINISTRATEUR", "DIRECTEUR") or (role_requis and u.role == role_requis)
+        autorise = est_direction(u) or (role_requis and u.role == role_requis)
         if not autorise:
             return Response(
                 {"detail": "Vous n'êtes pas habilité à viser cette étape."},
