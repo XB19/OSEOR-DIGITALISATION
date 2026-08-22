@@ -99,6 +99,14 @@ class Utilisateur(AbstractUser):
         blank=True
     )
 
+    date_naissance = models.DateField(
+        verbose_name="Date de naissance",
+        null=True,
+        blank=True,
+        help_text="Alimente les anniversaires du calendrier des événements."
+    )
+
+
     photo_profil = models.ImageField(
         verbose_name="Photo de profil",
         upload_to="utilisateurs/photos/",

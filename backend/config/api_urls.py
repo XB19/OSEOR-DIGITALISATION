@@ -18,6 +18,7 @@ from applications.notifications.api import NotificationViewSet
 from applications.journalisation.api import JournalActionViewSet
 from applications.tableau_bord.api import StatistiquesView
 from applications.documents.api import DocumentViewSet
+from applications.evenements.api import EvenementViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -31,6 +32,7 @@ router.register("delegations", DelegationViewSet, basename="delegation")
 router.register("notifications", NotificationViewSet, basename="notification")
 router.register("journal", JournalActionViewSet, basename="journal")
 router.register("documents", DocumentViewSet, basename="document")
+router.register("evenements", EvenementViewSet, basename="evenement")
 
 urlpatterns = [
     # Authentification JWT (dev)
