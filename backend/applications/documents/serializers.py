@@ -9,6 +9,7 @@ _TYPE_COURT = {
     TypeDocument.DEMANDE_ACHAT: "DA",
     TypeDocument.FICHE_TRANSPORT: "FT",
     TypeDocument.BON_SORTIE_CAISSE: "BSC",
+    TypeDocument.NOTE_INTERNE: "NI",
 }
 
 

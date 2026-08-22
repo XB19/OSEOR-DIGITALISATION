@@ -19,6 +19,7 @@ from applications.journalisation.api import JournalActionViewSet
 from applications.tableau_bord.api import StatistiquesView
 from applications.documents.api import DocumentViewSet
 from applications.evenements.api import EvenementViewSet
+from applications.notes.api import NoteRecueViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -33,6 +34,7 @@ router.register("notifications", NotificationViewSet, basename="notification")
 router.register("journal", JournalActionViewSet, basename="journal")
 router.register("documents", DocumentViewSet, basename="document")
 router.register("evenements", EvenementViewSet, basename="evenement")
+router.register("notes-recues", NoteRecueViewSet, basename="note-recue")
 
 urlpatterns = [
     # Authentification JWT (dev)

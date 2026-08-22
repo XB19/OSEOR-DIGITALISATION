@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
 
     'applications.evenements',
+    'applications.notes',
     'applications.planification',
     'applications.tableau_bord',
     'applications.documents',
