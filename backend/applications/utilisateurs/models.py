@@ -106,6 +106,14 @@ class Utilisateur(AbstractUser):
         help_text="Alimente les anniversaires du calendrier des événements."
     )
 
+    date_embauche = models.DateField(
+        verbose_name="Date d'embauche",
+        null=True,
+        blank=True,
+        help_text="Point de départ de l'acquisition des congés (2,5 j/mois). "
+                  "Sans elle, aucun congé n'est acquis."
+    )
+
 
     photo_profil = models.ImageField(
         verbose_name="Photo de profil",
