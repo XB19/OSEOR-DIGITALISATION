@@ -18,6 +18,7 @@ from applications.notifications.api import NotificationViewSet
 from applications.journalisation.api import JournalActionViewSet
 from applications.tableau_bord.api import StatistiquesView
 from applications.documents.api import DocumentViewSet
+from applications.conges.api import DemandeCongeViewSet, JourFerieViewSet
 from applications.evenements.api import EvenementViewSet
 from applications.notes.api import NoteRecueViewSet
 
@@ -34,6 +35,8 @@ router.register("notifications", NotificationViewSet, basename="notification")
 router.register("journal", JournalActionViewSet, basename="journal")
 router.register("documents", DocumentViewSet, basename="document")
 router.register("evenements", EvenementViewSet, basename="evenement")
+router.register("conges", DemandeCongeViewSet, basename="conge")
+router.register("jours-feries", JourFerieViewSet, basename="jour-ferie")
 router.register("notes-recues", NoteRecueViewSet, basename="note-recue")
 
 urlpatterns = [
