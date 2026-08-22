@@ -66,6 +66,35 @@ services:
     ports:
       - "8001:8001"
 
+  # Worker Celery : execute les traitements planifies (relance des visas,
+  # a venir : acquisition des conges, alertes de stock, expiration des
+  # contrats). Sans lui, les taches sont mises en file et jamais traitees.
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      - api
+      - redis
+    volumes:
+      - media_data:/app/media
+
+  # Ordonnanceur Celery : declenche les taches a l'heure dite. Les horaires
+  # sont lus en base (django-celery-beat) et modifiables depuis l'admin.
+  # Un SEUL exemplaire doit tourner, sinon chaque tache part en double.
+  beat:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+    command: ["celery", "-A", "config", "beat", "--loglevel=info",
+              "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    depends_on:
+      - api
+      - redis
+
   frontend:
     build: ./frontend
     restart: unless-stopped

@@ -38,6 +38,9 @@ COLONNES_DEFAUT = {
         {"cle": "montant_credit", "libelle": "Montant crédit"},
         {"cle": "objet", "libelle": "Objet ou motif de sortie de caisse"},
     ],
+    # Une note de service n'a pas de tableau de lignes : son contenu tient
+    # dans l'objet et le corps, portes par champs_entete.
+    TypeDocument.NOTE_INTERNE: [],
 }
 
 # Chaînes de visas par défaut, par type de document (utilisées quand
@@ -63,6 +66,11 @@ VISAS_DEFAUT = {
         {"cle": "chef_service_dep", "libelle": "Visa Chef Sce Dép.", "role": "CHEF_SERVICE"},
         {"cle": "resp_tresorerie", "libelle": "Visa Resp. Trésorerie", "role": "COMPTABLE"},
         {"cle": "finance_comptabilite", "libelle": "Visa Finance Comptabilité", "role": "COMPTABLE"},
+    ],
+    # La note n'est diffusée qu'une fois signée par la direction.
+    TypeDocument.NOTE_INTERNE: [
+        {"cle": "redacteur", "libelle": "Rédigée par"},
+        {"cle": "directeur_general", "libelle": "Visa du Directeur Général", "role": "DIRECTEUR"},
     ],
 }
 

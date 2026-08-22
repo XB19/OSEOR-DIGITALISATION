@@ -1,8 +1,8 @@
 from rest_framework import viewsets
 
 from config.permissions import LectureSeulePourTous
-from .models import Filiale
-from .serializers import FilialeSerializer
+from .models import Filiale, Service
+from .serializers import FilialeSerializer, ServiceSerializer
 
 
 class FilialeViewSet(viewsets.ModelViewSet):
@@ -17,3 +17,25 @@ class FilialeViewSet(viewsets.ModelViewSet):
     filterset_fields = ("active",)
     search_fields = ("nom", "code")
     ordering_fields = ("nom",)
+
+
+class ServiceViewSet(viewsets.ModelViewSet):
+    """
+    Services (départements) d'une filiale. Lecture pour tous — les listes
+    déroulantes « service » en ont besoin — écriture réservée
+    admin/secrétaire, comme les filiales.
+    """
+
+    serializer_class = ServiceSerializer
+    permission_classes = [LectureSeulePourTous]
+    filterset_fields = ("filiale", "actif")
+    search_fields = ("nom", "code")
+    ordering_fields = ("nom",)
+
+    def get_queryset(self):
+        return (
+            Service.objects
+            .select_related("filiale", "chef")
+            .prefetch_related("membres")
+            .all()
+        )

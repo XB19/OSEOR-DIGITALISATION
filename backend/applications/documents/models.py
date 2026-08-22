@@ -12,6 +12,7 @@ class TypeDocument(models.TextChoices):
     DEMANDE_ACHAT = "DEMANDE_ACHAT", "Demande d'achat"
     FICHE_TRANSPORT = "FICHE_TRANSPORT", "Fiche de transport"
     BON_SORTIE_CAISSE = "BON_SORTIE_CAISSE", "Bon de sortie de caisse"
+    NOTE_INTERNE = "NOTE_INTERNE", "Note interne"
 
 
 class ConfigurationDocument(models.Model):
