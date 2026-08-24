@@ -1,6 +1,7 @@
 """Tâches planifiées du module Congés."""
 
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 from . import services
@@ -21,24 +22,37 @@ def crediter_acquisitions():
 
 
 @shared_task(name="conges.expirer_soldes")
-def expirer_soldes(forcer=False):
+def expirer_soldes(annee=None, forcer=False):
     """
-    Purge les soldes non pris au 31 décembre (règle RH : jours perdus).
+    Purge les soldes d'une année révolue.
 
-    Refuse d'agir un autre jour, même si l'ordonnanceur la déclenche : une
-    planification erronée a déjà programmé cette tâche toutes les nuits, et
-    elle aurait vidé le solde de tout le personnel chaque soir. L'opération
-    étant destructrice, elle vérifie elle-même la date plutôt que de faire
-    confiance à son appelant.
+    **Inactive par défaut** : les congés se cumulent sans limite de temps
+    (décision OSEOR), cette tâche n'est plus planifiée. Elle subsiste pour
+    le jour où le groupe appliquerait le plafond légal de report de deux
+    ans (Code du travail togolais, art. 200 à 202) — il suffira alors de
+    renseigner `CONGES_REPORT_MAX_ANNEES` et de replanifier.
 
-    `forcer=True` permet une clôture manuelle hors du 31 décembre.
+    L'opération étant destructrice, elle refuse d'agir tant qu'aucun
+    plafond n'est configuré, et vérifie elle-même la date plutôt que de
+    faire confiance à son ordonnanceur : une planification erronée a déjà
+    programmé cette tâche toutes les nuits, ce qui aurait vidé le solde de
+    tout le personnel chaque soir.
     """
+    plafond = getattr(settings, "CONGES_REPORT_MAX_ANNEES", None)
+
+    if plafond is None and not forcer:
+        return ("ignoree : les conges se cumulent sans limite "
+                "(CONGES_REPORT_MAX_ANNEES non defini)")
+
     aujourdhui = timezone.localdate()
 
     if not forcer and (aujourdhui.month, aujourdhui.day) != (12, 31):
         return f"ignoree : {aujourdhui:%d/%m} n'est pas le 31/12"
 
-    return str(services.expirer_tous_les_soldes())
+    if annee is None:
+        annee = aujourdhui.year - (plafond or 0)
+
+    return str(services.expirer_tous_les_soldes(annee))
 
 
 TACHES_PLANIFIEES = [
@@ -51,14 +65,7 @@ TACHES_PLANIFIEES = [
             "de service vient d'être révolu."
         ),
     },
-    {
-        "nom": "Expiration des soldes de congés",
-        "tache": "conges.expirer_soldes",
-        "crontab": {"minute": "30", "hour": "23", "day_of_month": "31",
-                    "month_of_year": "12"},
-        "description": (
-            "Le 31 décembre à 23h30, solde les jours non pris — ils sont "
-            "perdus."
-        ),
-    },
+    # Pas de tâche d'expiration : les congés se cumulent sans limite de
+    # temps. `conges.expirer_soldes` reste disponible pour une exécution
+    # manuelle si le plafond légal de report venait à être appliqué.
 ]

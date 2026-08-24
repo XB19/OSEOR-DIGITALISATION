@@ -18,7 +18,10 @@ from config.permissions import RH, est_direction
 
 from . import services
 from .calendrier import compter_jours_ouvres
-from .models import DemandeConge
+from .convention import (
+    ANCIENNETE_REQUISE_MOIS, exige_anciennete, jours_accordes, regle,
+)
+from .models import DemandeConge, TypeConge
 
 
 class DemandeRefusee(Exception):
@@ -74,9 +77,53 @@ def _chevauchement(utilisateur, date_debut, date_fin, exclure=None):
     return demandes
 
 
-def deposer(utilisateur, type_conge, date_debut, date_fin, motif=""):
+def _anciennete_mois(utilisateur, reference):
+    """Mois de service révolus à la date de référence."""
+    embauche = utilisateur.date_embauche
+    if embauche is None:
+        return 0
+
+    mois = (reference.year - embauche.year) * 12 + (reference.month - embauche.month)
+    if reference.day < embauche.day:
+        mois -= 1
+    return max(mois, 0)
+
+
+def _verifier_permission(utilisateur, motif_permission, jours, date_debut):
     """
-    Dépose une demande de congé après vérification des règles métier.
+    Contrôles propres aux permissions exceptionnelles (article 45 CCIT).
+
+    Le barème fixe un droit maximal par évènement ; la condition de six
+    mois d'ancienneté vaut pour les permissions syndicales mais pas pour
+    les évènements familiaux, que l'article dispense expressément.
+    """
+    regle_motif = regle(motif_permission)
+    if regle_motif is None:
+        raise DemandeRefusee(
+            "Motif de permission inconnu au barème de l'article 45."
+        )
+
+    droit = jours_accordes(motif_permission)
+    if jours > droit:
+        raise DemandeRefusee(
+            f"« {regle_motif['libelle']} » ouvre droit à {droit} jour(s) ; "
+            f"{jours} jour(s) demandé(s)."
+        )
+
+    if exige_anciennete(motif_permission):
+        anciennete = _anciennete_mois(utilisateur, date_debut)
+        if anciennete < ANCIENNETE_REQUISE_MOIS:
+            raise DemandeRefusee(
+                f"Cette permission demande {ANCIENNETE_REQUISE_MOIS} mois "
+                f"d'ancienneté ; vous en comptez {anciennete}."
+            )
+
+
+def deposer(utilisateur, type_conge, date_debut, date_fin, motif="",
+            motif_permission="", date_evenement=None):
+    """
+    Dépose une demande de congé ou de permission après vérification des
+    règles métier.
 
     Lève `DemandeRefusee` avec un message destiné à l'utilisateur.
     """
@@ -95,6 +142,19 @@ def deposer(utilisateur, type_conge, date_debut, date_fin, motif=""):
             "Vous avez déjà une demande en cours sur cette période."
         )
 
+    if type_conge == TypeConge.PERMISSION:
+        if not motif_permission:
+            raise DemandeRefusee(
+                "Précisez l'évènement invoqué : le barème de l'article 45 "
+                "fixe un nombre de jours par motif."
+            )
+        _verifier_permission(utilisateur, motif_permission, jours, date_debut)
+    elif motif_permission:
+        raise DemandeRefusee(
+            "Un motif de permission ne se renseigne que sur une permission "
+            "exceptionnelle."
+        )
+
     demande = DemandeConge(
         utilisateur=utilisateur,
         type_conge=type_conge,
@@ -102,10 +162,15 @@ def deposer(utilisateur, type_conge, date_debut, date_fin, motif=""):
         date_fin=date_fin,
         jours_ouvres=jours,
         motif=motif,
+        motif_permission=motif_permission,
+        date_evenement=date_evenement,
     )
 
     if demande.decompte_le_solde:
-        disponible = services.solde_disponible(utilisateur, date_debut.year)
+        # Solde cumulatif : les jours non pris se reportent sans limite de
+        # temps, une demande de janvier peut donc puiser dans des droits
+        # acquis les années précédentes.
+        disponible = services.solde_disponible(utilisateur)
         if jours > disponible:
             raise DemandeRefusee(
                 f"Solde insuffisant : {jours} jour(s) demandé(s) pour "

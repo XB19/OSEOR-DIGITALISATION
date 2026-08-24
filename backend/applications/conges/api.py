@@ -2,14 +2,16 @@ from datetime import date
 
 from rest_framework import mixins, viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from config.permissions import RH, est_direction, restreindre_a_la_filiale
 
 from .models import DemandeConge, JourFerie, MouvementConge
 from .serializers import (
-    AnnulationSerializer, DecisionSerializer, DemandeCongeSerializer,
-    DepotDemandeSerializer, JourFerieSerializer, MouvementCongeSerializer,
+    AnnulationSerializer, BaremePermissionSerializer, DecisionSerializer,
+    DemandeCongeSerializer, DepotDemandeSerializer, JourFerieSerializer,
+    MouvementCongeSerializer,
 )
 from . import services, workflow
 from .workflow import DemandeRefusee
@@ -57,6 +59,8 @@ class DemandeCongeViewSet(mixins.ListModelMixin,
                 entree.validated_data["date_debut"],
                 entree.validated_data["date_fin"],
                 entree.validated_data["motif"],
+                motif_permission=entree.validated_data.get("motif_permission", ""),
+                date_evenement=entree.validated_data.get("date_evenement"),
             )
         except DemandeRefusee as erreur:
             return Response({"detail": str(erreur)}, status=400)
@@ -94,6 +98,51 @@ class DemandeCongeViewSet(mixins.ListModelMixin,
                 self.get_object(), request.user, entree.validated_data["motif"])
         except DemandeRefusee as erreur:
             return Response({"detail": str(erreur)}, status=400)
+
+        return Response(DemandeCongeSerializer(demande).data)
+
+    @action(detail=False, methods=["get"])
+    def bareme_permissions(self, request):
+        """
+        Barème des permissions exceptionnelles (article 45 de la CCIT) :
+        motifs, jours accordés, justificatif attendu et condition
+        d'ancienneté. Alimente la liste déroulante du formulaire.
+        """
+        return Response(BaremePermissionSerializer.bareme())
+
+    @action(detail=True, methods=["post"],
+            parser_classes=[MultiPartParser, FormParser])
+    def justificatif(self, request, pk=None):
+        """
+        Dépose la pièce justifiant l'évènement — l'article 45 impose de la
+        produire « au plus tard huit jours après que l'évènement ait eu
+        lieu ».
+        """
+        demande = self.get_object()
+
+        if not demande.est_permission:
+            return Response(
+                {"detail": "Seule une permission exceptionnelle demande un "
+                           "justificatif."}, status=400)
+
+        autorise = (
+            demande.utilisateur_id == request.user.pk
+            or est_direction(request.user)
+            or request.user.role == RH
+        )
+        if not autorise:
+            return Response(
+                {"detail": "Vous ne pouvez pas déposer de pièce sur cette "
+                           "demande."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        fichier = request.data.get("justificatif")
+        if not fichier:
+            return Response({"detail": "Aucun fichier transmis."}, status=400)
+
+        demande.justificatif = fichier
+        demande.save(update_fields=["justificatif"])
 
         return Response(DemandeCongeSerializer(demande).data)
 

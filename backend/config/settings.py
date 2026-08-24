@@ -220,6 +220,21 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # Garde-fous : une tâche qui part en boucle est arrêtée plutôt que de
 # monopoliser un worker.
+# =====================================================================
+# Conges
+# =====================================================================
+
+# Report des conges non pris, en annees. None = cumul illimite, les jours
+# ne sont jamais perdus (decision OSEOR). Le Code du travail togolais
+# (art. 200 a 202) n'impose qu'un report de deux ans d'accord-parties :
+# mettre 2 ici pour s'aligner sur le minimum legal, et replanifier la
+# tache conges.expirer_soldes.
+CONGES_REPORT_MAX_ANNEES = config(
+    "CONGES_REPORT_MAX_ANNEES", default=None,
+    cast=lambda v: None if v in ("", "None", None) else int(v),
+)
+
+
 CELERY_TASK_SOFT_TIME_LIMIT = 300
 CELERY_TASK_TIME_LIMIT = 360
 

@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from applications.conges import services
 from applications.conges.models import DemandeConge, MouvementConge, TypeConge
@@ -290,14 +290,20 @@ class ExpirationTests(BaseSoldes, TestCase):
 
 class GardeFouExpirationTests(BaseSoldes, TestCase):
     """
-    L'expiration est destructrice : elle vérifie elle-même la date plutôt
-    que de faire confiance à son ordonnanceur.
+    L'expiration est destructrice : elle vérifie elle-même la date et
+    l'existence d'un plafond, plutôt que de faire confiance à son
+    ordonnanceur.
+
+    Ces tests décrivent le comportement SI le plafond légal de report était
+    activé (`CONGES_REPORT_MAX_ANNEES`). En fonctionnement courant il ne
+    l'est pas, et rien n'expire — voir `TacheExpirationInactiveTests`.
     """
 
     def setUp(self):
         self.creer_donnees()
         services.crediter_acquisitions(self.salarie, date(2026, 12, 20))
 
+    @override_settings(CONGES_REPORT_MAX_ANNEES=0)
     def test_refuse_d_agir_hors_du_31_decembre(self):
         from unittest import mock
         from applications.conges.tasks import expirer_soldes
@@ -308,10 +314,11 @@ class GardeFouExpirationTests(BaseSoldes, TestCase):
         ):
             resultat = expirer_soldes()
 
-        self.assertIn("ignoree", resultat)
-        self.assertEqual(services.solde(self.salarie, 2026), Decimal("7.5"))
+        self.assertIn("31/12", resultat)
+        self.assertEqual(services.solde(self.salarie), Decimal("7.5"))
 
-    def test_agit_le_31_decembre(self):
+    @override_settings(CONGES_REPORT_MAX_ANNEES=0)
+    def test_agit_le_31_decembre_si_un_plafond_est_configure(self):
         from unittest import mock
         from applications.conges.tasks import expirer_soldes
 
@@ -321,16 +328,109 @@ class GardeFouExpirationTests(BaseSoldes, TestCase):
         ):
             expirer_soldes()
 
-        self.assertEqual(services.solde(self.salarie, 2026), Decimal("0"))
+        self.assertEqual(services.solde(self.salarie), Decimal("0"))
 
-    def test_forcage_manuel_possible(self):
+    @override_settings(CONGES_REPORT_MAX_ANNEES=2)
+    def test_le_plafond_determine_l_annee_purgee(self):
+        """Avec un report de deux ans, on purge l'année N-2, pas l'année N."""
         from unittest import mock
         from applications.conges.tasks import expirer_soldes
 
+        services.crediter_acquisitions(self.salarie, date(2028, 12, 20))
+
         with mock.patch(
             "applications.conges.tasks.timezone.localdate",
-            return_value=date(2026, 6, 15),
+            return_value=date(2028, 12, 31),
         ):
-            expirer_soldes(forcer=True)
+            expirer_soldes()
 
         self.assertEqual(services.solde(self.salarie, 2026), Decimal("0"))
+        self.assertGreater(services.solde(self.salarie, 2028), Decimal("0"))
+
+    def test_forcage_manuel_possible(self):
+        from applications.conges.tasks import expirer_soldes
+
+        expirer_soldes(annee=2026, forcer=True)
+
+        self.assertEqual(services.solde(self.salarie), Decimal("0"))
+
+
+class CumulSansLimiteTests(BaseSoldes, TestCase):
+    """
+    Les congés non pris se reportent sans limite de temps : ils ne sont
+    jamais perdus en fin d'année (décision OSEOR, plus favorable que le
+    report légal de deux ans du Code du travail togolais).
+    """
+
+    def setUp(self):
+        self.creer_donnees()
+
+    def test_solde_cumule_sur_plusieurs_annees(self):
+        services.crediter_acquisitions(self.salarie, date(2028, 9, 15))
+
+        # 24 échéances d'octobre 2026 à septembre 2028.
+        self.assertEqual(services.solde(self.salarie), Decimal("60"))
+
+    def test_solde_par_annee_reste_consultable(self):
+        """Le détail annuel sert à expliquer un compteur, pas à le cloisonner."""
+        services.crediter_acquisitions(self.salarie, date(2027, 12, 15))
+
+        self.assertEqual(services.solde(self.salarie, 2026), Decimal("7.5"))
+        self.assertEqual(services.solde(self.salarie, 2027), Decimal("30"))
+        self.assertEqual(services.solde(self.salarie), Decimal("37.5"))
+
+    def test_situation_expose_cumul_et_annee(self):
+        services.crediter_acquisitions(self.salarie, date(2027, 12, 15))
+
+        situation = services.situation(self.salarie, 2027)
+
+        self.assertEqual(situation["acquis_total"], Decimal("37.5"))
+        self.assertEqual(situation["acquis"], Decimal("30"))
+        self.assertEqual(situation["solde"], Decimal("37.5"))
+
+    def test_reserve_cumulative(self):
+        """Une demande pour l'an prochain mobilise des jours dès maintenant."""
+        services.crediter_acquisitions(self.salarie, date(2027, 12, 15))
+
+        DemandeConge.objects.create(
+            utilisateur=self.salarie, type_conge=TypeConge.ANNUEL,
+            date_debut=date(2028, 2, 7), date_fin=date(2028, 2, 11),
+            jours_ouvres=5)
+
+        self.assertEqual(
+            services.solde_disponible(self.salarie), Decimal("32.5"))
+
+
+class TacheExpirationInactiveTests(BaseSoldes, TestCase):
+    """
+    La tâche d'expiration existe encore, pour le jour où le plafond légal
+    de report serait appliqué — mais elle ne doit rien faire tant qu'aucun
+    plafond n'est configuré.
+    """
+
+    def setUp(self):
+        self.creer_donnees()
+        services.crediter_acquisitions(self.salarie, date(2026, 12, 20))
+
+    def test_sans_plafond_configure_ne_fait_rien(self):
+        from applications.conges.tasks import expirer_soldes
+
+        resultat = expirer_soldes()
+
+        self.assertIn("cumulent sans limite", resultat)
+        self.assertEqual(services.solde(self.salarie), Decimal("7.5"))
+
+    def test_absente_de_la_planification(self):
+        """Aucune tâche planifiée ne doit purger un solde."""
+        from applications.planification.registre import collecter_taches
+
+        taches = [t["tache"] for t in collecter_taches()]
+
+        self.assertNotIn("conges.expirer_soldes", taches)
+
+    def test_forcage_manuel_reste_possible(self):
+        from applications.conges.tasks import expirer_soldes
+
+        expirer_soldes(annee=2026, forcer=True)
+
+        self.assertEqual(services.solde(self.salarie), Decimal("0"))

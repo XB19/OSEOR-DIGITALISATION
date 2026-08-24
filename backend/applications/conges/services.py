@@ -1,14 +1,18 @@
 """
 Soldes de congés : acquisition, disponibilité, consommation, expiration.
 
-Le solde n'est jamais un compteur : c'est la somme des `MouvementConge` de
-l'année. Toute correction s'écrit en ajoutant une écriture inverse, jamais
-en retouchant l'historique — c'est ce qui permet de justifier un solde
-ligne à ligne devant un salarié.
+Le solde n'est jamais un compteur : c'est la somme des `MouvementConge`.
+Toute correction s'écrit en ajoutant une écriture inverse, jamais en
+retouchant l'historique — c'est ce qui permet de justifier un solde ligne
+à ligne devant un salarié.
 
-Règles RH appliquées (2026-08-21) : 2,5 jours par mois de service révolu à
-compter de la date d'embauche, solde perdu au 31 décembre, pas de
-demi-journée.
+Règles RH appliquées : 2,5 jours par mois de service révolu à compter de
+la date d'embauche, **cumul sans limite de temps** (les jours non pris ne
+sont jamais perdus), pas de demi-journée.
+
+Le champ `annee` des mouvements reste renseigné : il sert à dire d'où
+vient chaque jour, pas à cloisonner le solde. Le solde d'un salarié est la
+somme de TOUS ses mouvements, toutes années confondues.
 """
 
 from calendar import monthrange
@@ -35,14 +39,20 @@ PLAFOND_ANNUEL = Decimal("30")
 # =====================================================================
 
 def solde(utilisateur, annee=None):
-    """Solde acquis et non consommé pour l'année (somme du registre)."""
-    annee = annee or date.today().year
+    """
+    Solde acquis et non consommé.
 
-    total = MouvementConge.objects.filter(
-        utilisateur=utilisateur, annee=annee,
-    ).aggregate(total=Sum("jours"))["total"]
+    Sans `annee`, renvoie le **cumul de toutes les années** : c'est le
+    solde réel du salarié, celui qu'il peut poser. Avec `annee`, ne
+    considère que les mouvements rattachés à cette année — utile pour
+    expliquer un compteur, jamais pour décider d'une demande.
+    """
+    mouvements = MouvementConge.objects.filter(utilisateur=utilisateur)
 
-    return total or Decimal("0")
+    if annee is not None:
+        mouvements = mouvements.filter(annee=annee)
+
+    return mouvements.aggregate(total=Sum("jours"))["total"] or Decimal("0")
 
 
 def jours_reserves(utilisateur, annee=None):
@@ -52,42 +62,62 @@ def jours_reserves(utilisateur, annee=None):
     Sans cette réserve, deux demandes soumises coup sur coup pourraient
     être validées séparément et faire passer le solde sous zéro : chacune
     aurait vu un solde encore intact.
-    """
-    annee = annee or date.today().year
 
-    total = DemandeConge.objects.filter(
+    Comme le solde, la réserve est cumulative par défaut : une demande
+    déposée en décembre pour janvier mobilise des jours dès maintenant.
+    """
+    demandes = DemandeConge.objects.filter(
         utilisateur=utilisateur,
         statut=DemandeConge.Statut.EN_ATTENTE,
         type_conge=TypeConge.ANNUEL,
-        date_debut__year=annee,
-    ).aggregate(total=Sum("jours_ouvres"))["total"]
+    )
 
-    return Decimal(total or 0)
+    if annee is not None:
+        demandes = demandes.filter(date_debut__year=annee)
+
+    return Decimal(
+        demandes.aggregate(total=Sum("jours_ouvres"))["total"] or 0)
 
 
 def solde_disponible(utilisateur, annee=None):
-    """Ce qu'il reste réellement à poser : acquis moins jours réservés."""
+    """
+    Ce qu'il reste réellement à poser : acquis moins jours réservés.
+
+    Cumulatif par défaut, comme `solde` — c'est cette valeur que le dépôt
+    d'une demande vérifie.
+    """
     return solde(utilisateur, annee) - jours_reserves(utilisateur, annee)
 
 
 def situation(utilisateur, annee=None):
-    """Vue d'ensemble du compteur d'un salarié, pour l'API et l'affichage."""
+    """
+    Compteur d'un salarié : le solde réel est cumulatif, le détail de
+    l'année en cours est donné à part pour que chacun comprenne d'où
+    viennent ses jours.
+    """
     annee = annee or date.today().year
 
-    mouvements = MouvementConge.objects.filter(utilisateur=utilisateur, annee=annee)
+    tous = MouvementConge.objects.filter(utilisateur=utilisateur)
+    de_l_annee = tous.filter(annee=annee)
 
-    def _somme(type_mouvement):
-        total = mouvements.filter(type_mouvement=type_mouvement).aggregate(
-            total=Sum("jours"))["total"]
-        return total or Decimal("0")
+    def _somme(queryset, type_mouvement):
+        return queryset.filter(type_mouvement=type_mouvement).aggregate(
+            total=Sum("jours"))["total"] or Decimal("0")
+
+    acquisition = MouvementConge.TypeMouvement.ACQUISITION
+    consommation = MouvementConge.TypeMouvement.CONSOMMATION
 
     return {
         "annee": annee,
-        "acquis": _somme(MouvementConge.TypeMouvement.ACQUISITION),
-        "pris": abs(_somme(MouvementConge.TypeMouvement.CONSOMMATION)),
-        "reserves": jours_reserves(utilisateur, annee),
-        "solde": solde(utilisateur, annee),
-        "disponible": solde_disponible(utilisateur, annee),
+        # Cumul, toutes années confondues : le droit réel du salarié.
+        "acquis_total": _somme(tous, acquisition),
+        "pris_total": abs(_somme(tous, consommation)),
+        "solde": solde(utilisateur),
+        "reserves": jours_reserves(utilisateur),
+        "disponible": solde_disponible(utilisateur),
+        # Détail de l'année en cours, pour l'affichage.
+        "acquis": _somme(de_l_annee, acquisition),
+        "pris": abs(_somme(de_l_annee, consommation)),
     }
 
 
@@ -203,7 +233,12 @@ def crediter_toutes_les_acquisitions(jusqu_a=None):
 
 def expirer_solde(utilisateur, annee):
     """
-    Solde perdu au 31 décembre, conformément à la règle RH.
+    Purge le solde rattaché à une année révolue.
+
+    **Hors du fonctionnement courant** : les congés se cumulent sans
+    limite de temps. Cette fonction ne sert que si le groupe décide un
+    jour d'appliquer le plafond légal de report (deux ans, Code du travail
+    togolais art. 200 à 202) — voir `CONGES_REPORT_MAX_ANNEES`.
 
     L'écriture d'expiration matérialise la perte au registre plutôt que de
     remettre un compteur à zéro : le salarié peut voir combien de jours il
