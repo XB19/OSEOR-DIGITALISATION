@@ -80,6 +80,9 @@ def anniversaires(debut, fin, utilisateur):
 
     Renvoie des dictionnaires, pas des `Evenement` : ces occurrences n'ont
     pas d'existence en base et ne doivent pas prétendre le contraire.
+
+    L'âge n'est volontairement pas exposé : souhaiter un anniversaire ne
+    demande pas de connaître l'année de naissance de ses collègues.
     """
     if debut > fin:
         return []
@@ -103,7 +106,6 @@ def anniversaires(debut, fin, utilisateur):
                     "date": jour,
                     "utilisateur_id": collegue.pk,
                     "filiale_id": collegue.filiale_id,
-                    "age": annee - collegue.date_naissance.year,
                 })
 
     return sorted(occurrences, key=lambda o: (o["date"], o["titre"]))

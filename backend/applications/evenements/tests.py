@@ -149,7 +149,7 @@ class AnniversairesTests(BaseEvenements, TestCase):
             date(2027, 3, 1), date(2027, 3, 31), self.collegue_mg)
         self.assertEqual(len(resultat), 1)
         self.assertEqual(resultat[0]["date"], date(2027, 3, 15))
-        self.assertEqual(resultat[0]["age"], 37)
+        self.assertNotIn("age", resultat[0])
 
     def test_hors_fenetre_ignore(self):
         self.assertEqual(

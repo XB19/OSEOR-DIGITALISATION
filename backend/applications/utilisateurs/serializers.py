@@ -7,7 +7,16 @@ User = get_user_model()
 
 
 class UtilisateurSerializer(serializers.ModelSerializer):
-    """Lecture d'un utilisateur (annuaire, profil)."""
+    """
+    Lecture d'un utilisateur (annuaire).
+
+    Lisible par TOUT utilisateur authentifié : n'y exposer que ce qui a sa
+    place dans un trombinoscope. `date_naissance` et `date_embauche` en
+    sont volontairement absentes — elles révéleraient l'âge et
+    l'ancienneté de chaque collègue du groupe. Elles restent visibles sur
+    son propre profil (`MoiSerializer`) et modifiables par
+    l'administrateur.
+    """
 
     nom_complet = serializers.CharField(read_only=True)
     role_libelle = serializers.CharField(source="get_role_display", read_only=True)
@@ -28,8 +37,6 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             "nom_complet",
             "email",
             "telephone",
-            "date_naissance",
-            "date_embauche",
             "role",
             "role_libelle",
             "filiale",
@@ -115,7 +122,9 @@ class MoiSerializer(UtilisateurSerializer):
     permissions = serializers.SerializerMethodField()
 
     class Meta(UtilisateurSerializer.Meta):
-        fields = UtilisateurSerializer.Meta.fields + ("permissions",)
+        fields = UtilisateurSerializer.Meta.fields + (
+            "date_naissance", "date_embauche", "permissions",
+        )
 
     def get_permissions(self, obj):
         return {
