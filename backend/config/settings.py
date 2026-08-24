@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'applications.evenements',
     'applications.notes',
     'applications.planification',
+    'applications.prestations',
     'applications.tableau_bord',
     'applications.documents',
     'applications.notifications',

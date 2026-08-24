@@ -20,6 +20,9 @@ from applications.tableau_bord.api import StatistiquesView
 from applications.documents.api import DocumentViewSet
 from applications.conges.api import DemandeCongeViewSet, JourFerieViewSet
 from applications.evenements.api import EvenementViewSet
+from applications.prestations.api import (
+    JalonPrestationViewSet, PrestationViewSet,
+)
 from applications.notes.api import NoteRecueViewSet
 
 router = DefaultRouter()
@@ -37,6 +40,8 @@ router.register("documents", DocumentViewSet, basename="document")
 router.register("evenements", EvenementViewSet, basename="evenement")
 router.register("conges", DemandeCongeViewSet, basename="conge")
 router.register("jours-feries", JourFerieViewSet, basename="jour-ferie")
+router.register("prestations", PrestationViewSet, basename="prestation")
+router.register("jalons", JalonPrestationViewSet, basename="jalon")
 router.register("notes-recues", NoteRecueViewSet, basename="note-recue")
 
 urlpatterns = [
