@@ -57,6 +57,11 @@ export function libelleSerie(r: Reservation): string {
   return parties.filter(Boolean).join(' · ');
 }
 
+/** Trouve le groupe contenant la réservation d'id donné (premiere ou occurrence). */
+export function trouverGroupe(groupes: GroupeReservations[], id: number): GroupeReservations | null {
+  return groupes.find((g) => g.premiere.id === id || g.occurrences.some((o) => o.id === id)) ?? null;
+}
+
 /** Résumé des statuts d'un groupe : « 2 × Validée · 1 × En attente ». */
 export function resumeStatuts(occurrences: Reservation[]): string {
   const compte = new Map<string, number>();

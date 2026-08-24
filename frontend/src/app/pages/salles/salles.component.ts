@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { DialogueService } from '../../core/dialogue.service';
+import { ToastService } from '../../core/toast.service';
 import { Salle, Equipement, Filiale } from '../../core/models';
 import { SalleVisuelleComponent } from '../../shared/salle-visuelle.component';
 import { IconComponent } from '../../shared/icon.component';
@@ -97,7 +99,10 @@ export class SallesComponent implements OnInit {
   photoFile: File | null = null;
   photoNom = signal('');
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  constructor(
+    private api: ApiService, private auth: AuthService,
+    private dialogue: DialogueService, private toasts: ToastService,
+  ) {}
 
   ngOnInit(): void {
     this.charger();
@@ -163,10 +168,18 @@ export class SallesComponent implements OnInit {
       error: (e) => this.erreur.set(this.msg(e)),
     });
   }
-  supprimer(s: Salle): void {
-    if (!confirm(`Supprimer la salle « ${s.nom} » ?`)) return;
-    this.api.supprimerSalle(s.id).subscribe({ next: () => this.charger(),
-      error: (e) => alert(this.msg(e)) });
+  async supprimer(s: Salle): Promise<void> {
+    const ok = await this.dialogue.demanderConfirmation({
+      titre: 'Supprimer la salle',
+      message: `« ${s.nom} » — cette action est définitive.`,
+      libelleConfirmer: 'Supprimer',
+      dangereux: true,
+    });
+    if (!ok) return;
+    this.api.supprimerSalle(s.id).subscribe({
+      next: () => this.charger(),
+      error: (e) => this.toasts.afficher({ titre: 'Suppression impossible', message: this.msg(e), type: 'ERROR' }),
+    });
   }
 
   private msg(e: any): string {

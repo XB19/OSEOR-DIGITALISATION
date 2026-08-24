@@ -5,7 +5,8 @@ import { environment } from '../../environments/environment';
 import {
   Salle, Equipement, Filiale, Reservation, DisponibiliteResultat,
   Audience, Delegation, Utilisateur, NotificationItem, Paginated, ParametresLDAP,
-  ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif,
+  ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif, StatutLivraison,
+  Article, MouvementStock, Contrat, RapportAdministratif,
 } from './models';
 
 /** Service d'accès à l'API REST OSEOR. */
@@ -200,6 +201,11 @@ export class ApiService {
     return this.http.post<{ detail: string }>(`${this.api}/parametres/ldap/tester/`, p);
   }
 
+  // ---------- Mon profil (photo, signature électronique) ----------
+  majMonProfil(donnees: FormData): Observable<Utilisateur> {
+    return this.http.patch<Utilisateur>(`${this.api}/auth/me/`, donnees);
+  }
+
   // ---------- Documents administratifs (Moyens Généraux) ----------
   configurationDocument(type_document: TypeDocumentAdministratif): Observable<ConfigurationDocument> {
     return this.http.get<ConfigurationDocument>(
@@ -212,10 +218,85 @@ export class ApiService {
   document(id: number): Observable<DocumentAdministratif> {
     return this.http.get<DocumentAdministratif>(`${this.api}/documents/${id}/`);
   }
-  creerDocument(d: any): Observable<DocumentAdministratif> {
+  creerDocument(d: any | FormData): Observable<DocumentAdministratif> {
     return this.http.post<DocumentAdministratif>(`${this.api}/documents/`, d);
+  }
+  dernierKm(): Observable<{ km_actuel: number | null }> {
+    return this.http.get<{ km_actuel: number | null }>(`${this.api}/documents/dernier_km/`);
   }
   viserDocument(id: number, decision: 'VALIDE' | 'REFUSE', commentaire = ''): Observable<DocumentAdministratif> {
     return this.http.post<DocumentAdministratif>(`${this.api}/documents/${id}/viser/`, { decision, commentaire });
+  }
+  telechargerDocumentPdf(id: number): Observable<Blob> {
+    return this.http.get(`${this.api}/documents/${id}/pdf/`, { responseType: 'blob' });
+  }
+  majStatutLivraison(id: number, statut_livraison: StatutLivraison): Observable<DocumentAdministratif> {
+    return this.http.post<DocumentAdministratif>(
+      `${this.api}/documents/${id}/statut_livraison/`, { statut_livraison });
+  }
+
+  // ---------- Gestion de stocks ----------
+  articles(filtres: Record<string, any> = {}): Observable<Paginated<Article>> {
+    return this.http.get<Paginated<Article>>(
+      `${this.api}/articles/`, { params: this.params({ ordering: 'nom', page_size: 200, ...filtres }) });
+  }
+  article(id: number): Observable<Article> {
+    return this.http.get<Article>(`${this.api}/articles/${id}/`);
+  }
+  articlesEnAlerte(): Observable<Article[]> {
+    return this.http.get<Article[]>(`${this.api}/articles/alertes/`);
+  }
+  creerArticle(a: Partial<Article>): Observable<Article> {
+    return this.http.post<Article>(`${this.api}/articles/`, a);
+  }
+  majArticle(id: number, a: Partial<Article>): Observable<Article> {
+    return this.http.patch<Article>(`${this.api}/articles/${id}/`, a);
+  }
+  mouvementsStock(filtres: Record<string, any> = {}): Observable<Paginated<MouvementStock>> {
+    return this.http.get<Paginated<MouvementStock>>(
+      `${this.api}/mouvements-stock/`, { params: this.params({ ordering: '-date_creation', page_size: 100, ...filtres }) });
+  }
+  creerMouvementStock(m: { article: number; type_mouvement: 'ENTREE' | 'SORTIE'; quantite: number; motif?: string }): Observable<MouvementStock> {
+    return this.http.post<MouvementStock>(`${this.api}/mouvements-stock/`, m);
+  }
+
+  // ---------- Contrats ----------
+  contrats(filtres: Record<string, any> = {}): Observable<Paginated<Contrat>> {
+    return this.http.get<Paginated<Contrat>>(
+      `${this.api}/contrats/`, { params: this.params({ ordering: '-date_creation', page_size: 100, ...filtres }) });
+  }
+  contrat(id: number): Observable<Contrat> {
+    return this.http.get<Contrat>(`${this.api}/contrats/${id}/`);
+  }
+  contratsAlertesEcheance(): Observable<Contrat[]> {
+    return this.http.get<Contrat[]>(`${this.api}/contrats/alertes_echeance/`);
+  }
+  creerContrat(c: Partial<Contrat>): Observable<Contrat> {
+    return this.http.post<Contrat>(`${this.api}/contrats/`, c);
+  }
+  majContrat(id: number, c: Partial<Contrat>): Observable<Contrat> {
+    return this.http.patch<Contrat>(`${this.api}/contrats/${id}/`, c);
+  }
+  resilierContrat(id: number, motif = ''): Observable<Contrat> {
+    return this.http.post<Contrat>(`${this.api}/contrats/${id}/resilier/`, { motif });
+  }
+  ajouterPieceJointeContrat(id: number, fichier: File): Observable<Contrat> {
+    const donnees = new FormData();
+    donnees.append('fichier', fichier);
+    return this.http.post<Contrat>(`${this.api}/contrats/${id}/ajouter_piece_jointe/`, donnees);
+  }
+  supprimerPieceJointeContrat(id: number, pieceJointeId: number): Observable<Contrat> {
+    return this.http.post<Contrat>(
+      `${this.api}/contrats/${id}/supprimer_piece_jointe/`, { piece_jointe: pieceJointeId });
+  }
+
+  // ---------- Rapports administratifs ----------
+  rapportAdministratif(filtres: { date_debut?: string; date_fin?: string; filiale?: number } = {}): Observable<RapportAdministratif> {
+    return this.http.get<RapportAdministratif>(
+      `${this.api}/rapports/administratif/`, { params: this.params(filtres) });
+  }
+  exporterRapportAdministratif(filtres: { date_debut?: string; date_fin?: string; filiale?: number } = {}): Observable<Blob> {
+    return this.http.get(
+      `${this.api}/rapports/administratif/export/`, { params: this.params(filtres), responseType: 'blob' });
   }
 }

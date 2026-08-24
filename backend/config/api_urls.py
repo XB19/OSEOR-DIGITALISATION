@@ -17,7 +17,10 @@ from applications.audiences.api import AudienceViewSet, DelegationViewSet
 from applications.notifications.api import NotificationViewSet
 from applications.journalisation.api import JournalActionViewSet
 from applications.tableau_bord.api import StatistiquesView
+from applications.tableau_bord.rapports import RapportAdministratifView, RapportAdministratifExportView
 from applications.documents.api import DocumentViewSet
+from applications.stocks.api import ArticleViewSet, MouvementStockViewSet
+from applications.contrats.api import ContratViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -30,6 +33,9 @@ router.register("delegations", DelegationViewSet, basename="delegation")
 router.register("notifications", NotificationViewSet, basename="notification")
 router.register("journal", JournalActionViewSet, basename="journal")
 router.register("documents", DocumentViewSet, basename="document")
+router.register("articles", ArticleViewSet, basename="article")
+router.register("mouvements-stock", MouvementStockViewSet, basename="mouvement-stock")
+router.register("contrats", ContratViewSet, basename="contrat")
 
 urlpatterns = [
     # Authentification JWT (dev)
@@ -41,6 +47,11 @@ urlpatterns = [
     path("parametres/ldap/tester/", TesterConnexionLDAPView.as_view(), name="parametres_ldap_tester"),
 
     path("tableau-bord/stats/", StatistiquesView.as_view(), name="tableau_bord_stats"),
+    path("rapports/administratif/", RapportAdministratifView.as_view(), name="rapport_administratif"),
+    path(
+        "rapports/administratif/export/", RapportAdministratifExportView.as_view(),
+        name="rapport_administratif_export",
+    ),
 
     path("", include(router.urls)),
 ]

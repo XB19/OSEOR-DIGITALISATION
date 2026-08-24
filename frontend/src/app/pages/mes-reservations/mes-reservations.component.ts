@@ -1,11 +1,13 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api.service';
+import { DialogueService } from '../../core/dialogue.service';
+import { ToastService } from '../../core/toast.service';
 import { Reservation } from '../../core/models';
 import { IconComponent } from '../../shared/icon.component';
 import {
-  GroupeReservations, grouperParSerie, libelleSerie, resumeStatuts,
+  GroupeReservations, grouperParSerie, libelleSerie, resumeStatuts, trouverGroupe,
 } from '../../shared/serie.util';
 
 @Component({
@@ -41,7 +43,7 @@ import {
             </tr>
             @if (serieOuverte() === g.premiere.serie) {
               @for (r of g.occurrences; track r.id) {
-                <tr class="occurrence">
+                <tr class="occurrence" [id]="'resa-' + r.id" [class.surlignee]="ligneSurlignee() === r.id">
                   <td><small>↳ occurrence</small></td>
                   <td>{{ r.date_reunion }}</td>
                   <td>{{ r.heure_debut.slice(0,5) }}–{{ r.heure_fin.slice(0,5) }}</td>
@@ -62,7 +64,7 @@ import {
               }
             }
           } @else {
-            <tr>
+            <tr [id]="'resa-' + g.premiere.id" [class.surlignee]="ligneSurlignee() === g.premiere.id">
               <td>{{ g.premiere.salle_nom }}<br><small>{{ g.premiere.filiale_nom }}</small></td>
               <td>{{ g.premiere.date_reunion }}</td>
               <td>{{ g.premiere.heure_debut.slice(0,5) }}–{{ g.premiere.heure_fin.slice(0,5) }}</td>
@@ -93,19 +95,39 @@ import {
     .ligne-serie { cursor: pointer; background: #faf9ff; }
     .ligne-serie:hover { background: #f3f0ff; }
     .occurrence { background: #fcfcfd; }
-    .occurrence td:first-child { padding-left: 1.6rem; }`],
+    .occurrence td:first-child { padding-left: 1.6rem; }
+    tr.surlignee { background: #fff7e6 !important; box-shadow: inset 3px 0 0 var(--accent); animation: pulseSurlignee 1.6s ease-out 1; }
+    @keyframes pulseSurlignee { 0% { background: #ffedc2 !important; } 100% { background: #fff7e6 !important; } }`],
 })
 export class MesReservationsComponent implements OnInit {
   groupes = signal<GroupeReservations[]>([]);
   serieOuverte = signal<number | null>(null);
+  ligneSurlignee = signal<number | null>(null);
 
-  constructor(private api: ApiService) {}
+  constructor(
+    private api: ApiService, private route: ActivatedRoute,
+    private dialogue: DialogueService, private toasts: ToastService,
+  ) {}
 
   ngOnInit(): void { this.charger(); }
 
   charger(): void {
     this.api.reservations({ mes: 1, ordering: '-date_reunion', page_size: 200 })
-      .subscribe((p) => this.groupes.set(grouperParSerie(p.results)));
+      .subscribe((p) => {
+        this.groupes.set(grouperParSerie(p.results));
+        this.ouvrirDepuisNotif();
+      });
+  }
+
+  /** Ouverture directe depuis une notification (?id=...) : déplie la série si besoin, surligne et scroll. */
+  private ouvrirDepuisNotif(): void {
+    const id = Number(this.route.snapshot.queryParamMap.get('id'));
+    if (!id) return;
+    const g = trouverGroupe(this.groupes(), id);
+    if (!g) return;
+    if (g.estSerie) this.serieOuverte.set(g.premiere.serie!);
+    this.ligneSurlignee.set(id);
+    setTimeout(() => document.getElementById('resa-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
   }
 
   basculerSerie(serieId: number): void {
@@ -115,11 +137,20 @@ export class MesReservationsComponent implements OnInit {
   libelle(r: Reservation): string { return libelleSerie(r); }
   resume(occ: Reservation[]): string { return resumeStatuts(occ); }
 
-  annuler(r: Reservation): void {
-    const motif = prompt("Motif d'annulation ?") ?? '';
+  async annuler(r: Reservation): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: 'Annuler la réservation',
+      message: `${r.salle_nom} — ${r.date_reunion} ${r.heure_debut.slice(0, 5)}–${r.heure_fin.slice(0, 5)}`,
+      placeholder: "Motif d'annulation (optionnel)",
+      libelleConfirmer: 'Annuler la réservation',
+      dangereux: true,
+    });
+    if (motif === null) return;
     this.api.annulerReservation(r.id, motif).subscribe({
       next: () => this.charger(),
-      error: (e) => alert(e?.error?.detail || 'Annulation impossible.'),
+      error: (e) => this.toasts.afficher({
+        titre: 'Annulation impossible', message: e?.error?.detail || 'Erreur inconnue.', type: 'ERROR',
+      }),
     });
   }
 

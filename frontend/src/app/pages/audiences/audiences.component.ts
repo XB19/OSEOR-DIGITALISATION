@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { DialogueService } from '../../core/dialogue.service';
+import { ToastService } from '../../core/toast.service';
 import { Audience, Salle, Utilisateur } from '../../core/models';
 import { IconComponent } from '../../shared/icon.component';
 
@@ -258,7 +260,14 @@ export class AudiencesComponent implements OnInit {
   form: any = {};
   editId: number | null = null;
 
-  constructor(private route: ActivatedRoute, private api: ApiService, public auth: AuthService) {}
+  constructor(
+    private route: ActivatedRoute, private api: ApiService, public auth: AuthService,
+    private dialogue: DialogueService, private toasts: ToastService,
+  ) {}
+
+  private erreurToast(titre: string, e: any): void {
+    this.toasts.afficher({ titre, message: e?.error?.detail || 'Erreur inconnue.', type: 'ERROR' });
+  }
 
   ngOnInit(): void {
     this.charger();
@@ -311,12 +320,18 @@ export class AudiencesComponent implements OnInit {
     this.mode.set('creation');
   }
 
-  annuler(a: Audience): void {
-    const motif = prompt("Motif de l'annulation (optionnel) :");
-    if (motif === null) return; // l'utilisateur a fermé la boîte de dialogue
+  async annuler(a: Audience): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: "Annuler l'audience",
+      message: a.nom_complet || a.nom,
+      placeholder: "Motif de l'annulation (optionnel)",
+      libelleConfirmer: 'Annuler',
+      dangereux: true,
+    });
+    if (motif === null) return;
     this.api.audienceAction(a.id, 'annuler', { motif }).subscribe({
       next: () => { this.charger(); this.ouvrir(a); },
-      error: (e) => alert(e?.error?.detail || "Erreur lors de l'annulation."),
+      error: (e) => this.erreurToast("Annulation impossible", e),
     });
   }
 
@@ -359,14 +374,22 @@ export class AudiencesComponent implements OnInit {
   action(a: Audience, action: string): void {
     this.api.audienceAction(a.id, action).subscribe({
       next: () => { this.charger(); this.ouvrir(a); },
-      error: (e) => alert(e?.error?.detail || 'Erreur.'),
+      error: (e) => this.erreurToast('Action impossible', e),
     });
   }
 
-  renvoyer(a: Audience): void {
-    const commentaire = prompt('Commentaire / précisions demandées :') ?? '';
+  async renvoyer(a: Audience): Promise<void> {
+    const commentaire = await this.dialogue.demanderMotif({
+      titre: 'Renvoyer pour complément',
+      message: a.nom_complet || a.nom,
+      placeholder: 'Précisions demandées',
+      libelleConfirmer: 'Renvoyer',
+      obligatoire: true,
+    });
+    if (commentaire === null) return;
     this.api.audienceAction(a.id, 'renvoyer_secretaire', { commentaire }).subscribe({
       next: () => { this.charger(); this.ouvrir(a); },
+      error: (e) => this.erreurToast('Renvoi impossible', e),
     });
   }
 
@@ -388,10 +411,14 @@ export class AudiencesComponent implements OnInit {
       ? this.delChoisis.filter((x) => x !== id) : [...this.delChoisis, id];
   }
   deleguer(a: Audience): void {
-    if (!this.delChoisis.length) { alert('Choisir au moins un délégué.'); return; }
+    if (!this.delChoisis.length) {
+      this.toasts.afficher({ titre: 'Délégation', message: 'Choisir au moins un délégué.', type: 'WARNING' });
+      return;
+    }
     this.api.audienceAction(a.id, 'deleguer',
       { delegues: this.delChoisis, commentaire: this.commentaireDeleg }).subscribe({
       next: () => { this.delegationVisible.set(false); this.ouvrir(a); },
+      error: (e) => this.erreurToast('Délégation impossible', e),
     });
   }
 
@@ -399,6 +426,7 @@ export class AudiencesComponent implements OnInit {
   prendreEnCompte(id: number): void {
     this.api.prendreEnCompteDelegation(id).subscribe({
       next: () => { const a = this.selection(); if (a) this.ouvrir(a); },
+      error: (e) => this.erreurToast('Action impossible', e),
     });
   }
 }

@@ -1,11 +1,14 @@
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from applications.journalisation.services import enregistrer_action
-from .models import Document, ConfigurationDocument
+from applications.notifications.services import envoyer_notification
+from .models import Document, ConfigurationDocument, TypeDocument
 from .services import notifier_etape_courante, notifier_decision_finale
+from .pdf import generer_pdf_document
 from .serializers import (
     DocumentSerializer,
     DocumentEcritureSerializer,
@@ -120,6 +123,84 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         return Response(DocumentSerializer(document, context=self.get_serializer_context()).data)
 
+    @action(detail=True, methods=["post"])
+    def statut_livraison(self, request, pk=None):
+        """
+        Suivi post-approbation d'un Bon de commande (Émission et suivi) :
+        met à jour le statut de livraison auprès du fournisseur. N'ouvre pas
+        de porte générale à l'édition des documents — n'affecte que cette
+        seule information de suivi, sur un Bon de commande déjà validé.
+        """
+        document = self.get_object()
+        if document.type_document != TypeDocument.BON_COMMANDE:
+            return Response({"detail": "Action réservée aux bons de commande."}, status=400)
+        if document.statut != Document.Statut.VALIDE:
+            return Response(
+                {"detail": "Le bon de commande doit être validé avant de suivre sa livraison."}, status=400,
+            )
+
+        u = request.user
+        autorise = u.role in ("ADMINISTRATEUR", "DIRECTEUR") or (
+            u.role == "SECRETAIRE" and u.filiale_id == document.filiale_id
+        )
+        if not autorise:
+            return Response(
+                {"detail": "Vous n'êtes pas habilité à mettre à jour ce suivi."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        nouveau_statut = request.data.get("statut_livraison")
+        valeurs_valides = dict(Document.StatutLivraison.choices)
+        if nouveau_statut not in valeurs_valides:
+            return Response({"detail": "Statut de livraison invalide."}, status=400)
+
+        champs = dict(document.champs_entete or {})
+        champs["statut_livraison"] = nouveau_statut
+        document.champs_entete = champs
+        document.save(update_fields=["champs_entete", "date_modification"])
+
+        enregistrer_action(
+            u, "BON_COMMANDE_SUIVI",
+            f"{document.numero} — {valeurs_valides[nouveau_statut]}", objet=document,
+        )
+        envoyer_notification(
+            document.demandeur, "Suivi de votre bon de commande",
+            f"{document.numero} — {valeurs_valides[nouveau_statut]}", "INFO", objet=document,
+        )
+        return Response(DocumentSerializer(document, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        """
+        Version imprimable/archivable du document : circuit de validation et
+        signatures scannées inclus. `get_object()` applique déjà le même
+        périmètre (filiale) que la consultation normale du document.
+        """
+        document = self.get_object()
+        contenu = generer_pdf_document(document)
+        reponse = HttpResponse(contenu, content_type="application/pdf")
+        reponse["Content-Disposition"] = f'attachment; filename="{document.numero}.pdf"'
+        return reponse
+
+    @action(detail=False, methods=["get"])
+    def dernier_km(self, request):
+        """
+        Dernier relevé "km_actuel" connu de l'utilisateur, pour pré-remplir
+        "Km précédent" d'une nouvelle fiche de transport (continuité du
+        compteur d'un mois sur l'autre).
+        """
+        recents = Document.objects.filter(
+            demandeur=request.user, type_document=TypeDocument.FICHE_TRANSPORT,
+        ).order_by("-date_creation")[:20]
+
+        km = None
+        for doc in recents:
+            valeur = doc.champs_entete.get("km_actuel") if isinstance(doc.champs_entete, dict) else None
+            if valeur not in (None, ""):
+                km = valeur
+                break
+        return Response({"km_actuel": km})
+
     @action(detail=False, methods=["get"])
     def configuration(self, request):
         """Configuration (colonnes + visas) du type de document pour la filiale de l'utilisateur."""
@@ -131,8 +212,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "Votre compte n'est rattaché à aucune filiale."}, status=400,
             )
-        config, _ = ConfigurationDocument.objects.get_or_create(
+        config = ConfigurationDocument.objects.filter(
             filiale=filiale, type_document=type_document,
-            defaults={"colonnes": [], "visas": []},
-        )
+        ).first()
+        if config is None:
+            # Ne pas persister une configuration vide juste parce qu'on l'a
+            # consultée : un document créé ensuite doit être bloqué (et non
+            # auto-validé) tant qu'un administrateur ne l'a pas réellement
+            # configurée (colonnes + visas).
+            config = ConfigurationDocument(filiale=filiale, type_document=type_document)
         return Response(ConfigurationDocumentSerializer(config).data)

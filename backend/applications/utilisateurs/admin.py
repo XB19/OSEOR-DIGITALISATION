@@ -34,6 +34,7 @@ class UtilisateurAdmin(UserAdmin):
                     "filiale",
                     "telephone",
                     "photo_profil",
+                    "signature",
                 )
             },
         ),

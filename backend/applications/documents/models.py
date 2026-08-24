@@ -12,6 +12,7 @@ class TypeDocument(models.TextChoices):
     DEMANDE_ACHAT = "DEMANDE_ACHAT", "Demande d'achat"
     FICHE_TRANSPORT = "FICHE_TRANSPORT", "Fiche de transport"
     BON_SORTIE_CAISSE = "BON_SORTIE_CAISSE", "Bon de sortie de caisse"
+    BON_COMMANDE = "BON_COMMANDE", "Bon de commande"
 
 
 class ConfigurationDocument(models.Model):
@@ -66,6 +67,13 @@ class ConfigurationDocument(models.Model):
     def __str__(self):
         return f"{self.filiale.nom} — {self.get_type_document_display()}"
 
+    @property
+    def configure(self) -> bool:
+        # Seule la chaîne de visas est indispensable : certains types de
+        # documents (ex. Fiche de transport) ont une mise en page dédiée et
+        # n'utilisent pas "colonnes".
+        return bool(self.visas)
+
 
 class Document(models.Model):
     """
@@ -78,6 +86,19 @@ class Document(models.Model):
         EN_COURS = "EN_COURS", "En cours de validation"
         VALIDE = "VALIDE", "Validé"
         REFUSE = "REFUSE", "Refusé"
+
+    class StatutLivraison(models.TextChoices):
+        """
+        Suivi post-approbation d'un Bon de commande (Émission et suivi) —
+        stocké dans `champs_entete["statut_livraison"]`, pas une colonne
+        dédiée : ne concerne que ce type de document, comme les autres
+        champs d'en-tête spécifiques (fournisseur, référence…).
+        """
+        EN_ATTENTE = "EN_ATTENTE", "En attente d'envoi"
+        ENVOYE = "ENVOYE", "Envoyé au fournisseur"
+        LIVRE_PARTIEL = "LIVRE_PARTIEL", "Livré partiellement"
+        LIVRE = "LIVRE", "Livré"
+        ANNULE = "ANNULE", "Annulé"
 
     filiale = models.ForeignKey(
         "filiales.Filiale",
@@ -147,6 +168,24 @@ class Document(models.Model):
     motif_rejet = models.TextField(
         verbose_name="Motif de rejet",
         blank=True,
+    )
+
+    document_source = models.ForeignKey(
+        "self",
+        verbose_name="Document source",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documents_derives",
+        help_text="Ex. la Demande d'achat à l'origine d'un Bon de commande.",
+    )
+
+    piece_jointe = models.FileField(
+        verbose_name="Pièce jointe (facture, reçu…)",
+        upload_to="documents/pieces_jointes/%Y/%m/",
+        null=True,
+        blank=True,
+        help_text="Facultatif — ex. reçu de parking, facture scannée.",
     )
 
     date_creation = models.DateTimeField(

@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, generics, permissions
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,6 +12,7 @@ from .serializers import (
     UtilisateurSerializer,
     UtilisateurEcritureSerializer,
     MoiSerializer,
+    MoiEcritureSerializer,
     ParametreLDAPSerializer,
 )
 
@@ -120,14 +122,28 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         return Response(UtilisateurSerializer(qs, many=True).data)
 
 
-class MoiView(generics.RetrieveAPIView):
-    """Profil de l'utilisateur connecté."""
+class MoiView(generics.RetrieveUpdateAPIView):
+    """
+    Profil de l'utilisateur connecté. PATCH/PUT : upload de sa propre
+    photo et/ou signature électronique (multipart/form-data).
+    """
 
-    serializer_class = MoiSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_object(self):
         return self.request.user
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return MoiEcritureSerializer
+        return MoiSerializer
+
+    def update(self, request, *args, **kwargs):
+        reponse = super().update(request, *args, **kwargs)
+        # Renvoie le profil complet (rôle, permissions...), pas seulement
+        # les deux champs modifiables, pour que le frontend reste à jour.
+        return Response(MoiSerializer(request.user).data)
 
 
 class ParametreLDAPView(generics.RetrieveUpdateAPIView):

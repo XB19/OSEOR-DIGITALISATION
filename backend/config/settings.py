@@ -44,6 +44,8 @@ INSTALLED_APPS = [
 
     'applications.tableau_bord',
     'applications.documents',
+    'applications.stocks',
+    'applications.contrats',
     'applications.notifications',
     'applications.reservations',
     'applications.audiences',

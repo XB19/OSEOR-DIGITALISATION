@@ -26,17 +26,22 @@ COLONNES_DEFAUT = {
         {"cle": "puht", "libelle": "PUHT"},
         {"cle": "montant", "libelle": "Montant"},
     ],
-    TypeDocument.FICHE_TRANSPORT: [
-        {"cle": "lieu", "libelle": "Lieu"},
-        {"cle": "motif", "libelle": "Motif"},
-        {"cle": "montant", "libelle": "Montant"},
-    ],
+    # Fiche de transport : mise en page dédiée (suivi kilométrique), n'utilise
+    # pas de colonnes configurables.
+    TypeDocument.FICHE_TRANSPORT: [],
     TypeDocument.BON_SORTIE_CAISSE: [
         {"cle": "compte_debit", "libelle": "Compte débit"},
         {"cle": "compte_credit", "libelle": "Compte crédit"},
         {"cle": "montant_debit", "libelle": "Montant débit"},
         {"cle": "montant_credit", "libelle": "Montant crédit"},
         {"cle": "objet", "libelle": "Objet ou motif de sortie de caisse"},
+    ],
+    TypeDocument.BON_COMMANDE: [
+        {"cle": "designation", "libelle": "Désignation"},
+        {"cle": "motif", "libelle": "Motif"},
+        {"cle": "qte", "libelle": "Qté"},
+        {"cle": "puht", "libelle": "PUHT"},
+        {"cle": "montant", "libelle": "Montant"},
     ],
 }
 
@@ -63,6 +68,13 @@ VISAS_DEFAUT = {
         {"cle": "chef_service_dep", "libelle": "Visa Chef Sce Dép.", "role": "CHEF_SERVICE"},
         {"cle": "resp_tresorerie", "libelle": "Visa Resp. Trésorerie", "role": "COMPTABLE"},
         {"cle": "finance_comptabilite", "libelle": "Visa Finance Comptabilité", "role": "COMPTABLE"},
+    ],
+    # Émis par la Secrétaire (visa 0, implicite), approuvé par la hiérarchie
+    # avant envoi au fournisseur.
+    TypeDocument.BON_COMMANDE: [
+        {"cle": "demandeur", "libelle": "Établi par (Secrétariat)"},
+        {"cle": "chef_service", "libelle": "Visa du Chef de Service", "role": "CHEF_SERVICE"},
+        {"cle": "directeur_general", "libelle": "Approbation du Directeur Général", "role": "DIRECTEUR"},
     ],
 }
 
@@ -109,11 +121,9 @@ SURCHARGES = {
         "visas": VISAS_DEFAUT[TypeDocument.BON_SORTIE_CAISSE],
     },
     ("KAPI", TypeDocument.FICHE_TRANSPORT): {
-        "colonnes": COLONNES_DEFAUT[TypeDocument.FICHE_TRANSPORT],
         "visas": VISAS_DEFAUT[TypeDocument.FICHE_TRANSPORT],
     },
     ("AROBASE", TypeDocument.FICHE_TRANSPORT): {
-        "colonnes": COLONNES_DEFAUT[TypeDocument.FICHE_TRANSPORT],
         "visas": [
             {"cle": "demandeur", "libelle": "Signature"},
             {"cle": "caissiere", "libelle": "Signature de la Caissière", "role": "COMPTABLE"},

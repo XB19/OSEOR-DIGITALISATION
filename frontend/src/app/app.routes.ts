@@ -9,18 +9,40 @@ const TYPES_DOCUMENT_IMPLEMENTES: Record<string, string> = Object.fromEntries(
   Object.entries(CHEMIN_PAR_TYPE_DOCUMENT).map(([type, chemin]) => [chemin, type]),
 );
 
+// Types de documents avec une mise en page dédiée (structure trop
+// spécifique pour le moteur générique DocumentsComponent).
+// `Partial<>` : un accès à une clé absente doit être typé `undefined`
+// (Record seul le typerait à tort comme toujours défini).
+const COMPOSANTS_DEDIES: Partial<Record<string, () => Promise<any>>> = {
+  FICHE_TRANSPORT: () =>
+    import('./pages/fiche-transport/fiche-transport.component').then((c) => c.FicheTransportComponent),
+};
+
+// Modules « Moyens Généraux » qui ne sont pas des documents à circuit de
+// visa (pas de ConfigurationDocument) mais une fonctionnalité dédiée à part
+// entière — chemin -> composant.
+const COMPOSANTS_PAR_CHEMIN: Partial<Record<string, () => Promise<any>>> = {
+  '/stocks': () => import('./pages/stocks/stocks.component').then((c) => c.StocksComponent),
+  '/contrats': () => import('./pages/contrats/contrats.component').then((c) => c.ContratsComponent),
+  '/rapports-administratifs': () =>
+    import('./pages/rapports/rapports.component').then((c) => c.RapportsComponent),
+};
+
 // Routes générées depuis le registre des modules « Moyens Généraux ». Les
 // modules non encore implémentés pointent vers EnConstructionComponent en
 // attendant leur tour, sans toucher à la navigation ni aux permissions.
 const routesModulesMetier: Routes = MODULES_MOYENS_GENERAUX.map((m) => {
   const typeDocument = TYPES_DOCUMENT_IMPLEMENTES[m.lien];
+  const composantDedie = COMPOSANTS_PAR_CHEMIN[m.lien] ?? (typeDocument ? COMPOSANTS_DEDIES[typeDocument] : undefined);
   return {
     path: m.lien.replace(/^\//, ''),
     ...(m.roles ? { canActivate: [roleGuard(...m.roles)] } : {}),
     data: { titre: m.libelle, type: typeDocument },
-    loadComponent: typeDocument
-      ? () => import('./pages/documents/documents.component').then((c) => c.DocumentsComponent)
-      : () => import('./pages/en-construction/en-construction.component').then((c) => c.EnConstructionComponent),
+    loadComponent: composantDedie
+      ? composantDedie
+      : typeDocument
+        ? () => import('./pages/documents/documents.component').then((c) => c.DocumentsComponent)
+        : () => import('./pages/en-construction/en-construction.component').then((c) => c.EnConstructionComponent),
   };
 });
 
@@ -91,6 +113,11 @@ export const routes: Routes = [
         canActivate: [roleGuard('ADMINISTRATEUR')],
         loadComponent: () =>
           import('./pages/administration/administration.component').then((m) => m.AdministrationComponent),
+      },
+      {
+        path: 'profil',
+        loadComponent: () =>
+          import('./pages/profil/profil.component').then((m) => m.ProfilComponent),
       },
       ...routesModulesMetier,
     ],

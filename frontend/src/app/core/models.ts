@@ -16,6 +16,8 @@ export interface Utilisateur {
   filiale: number | null;
   filiale_nom: string | null;
   actif: boolean;
+  photo_profil?: string | null;
+  signature?: string | null;
   source_auth?: 'SSO' | 'LOCAL';
   permissions?: {
     est_administrateur: boolean;
@@ -173,7 +175,17 @@ export interface ParametresLDAP {
 }
 
 export type TypeDocumentAdministratif =
-  'FICHE_BESOIN' | 'DEMANDE_ACHAT' | 'FICHE_TRANSPORT' | 'BON_SORTIE_CAISSE';
+  'FICHE_BESOIN' | 'DEMANDE_ACHAT' | 'FICHE_TRANSPORT' | 'BON_SORTIE_CAISSE' | 'BON_COMMANDE';
+
+export type StatutLivraison = 'EN_ATTENTE' | 'ENVOYE' | 'LIVRE_PARTIEL' | 'LIVRE' | 'ANNULE';
+
+export const LIBELLES_STATUT_LIVRAISON: Record<StatutLivraison, string> = {
+  EN_ATTENTE: "En attente d'envoi",
+  ENVOYE: 'Envoyé au fournisseur',
+  LIVRE_PARTIEL: 'Livré partiellement',
+  LIVRE: 'Livré',
+  ANNULE: 'Annulé',
+};
 
 export interface ColonneDocument {
   cle: string;
@@ -192,6 +204,7 @@ export interface ConfigurationDocument {
   type_document_libelle: string;
   colonnes: ColonneDocument[];
   visas: EtapeVisa[];
+  configure: boolean;
 }
 
 export interface HistoriqueVisa {
@@ -218,6 +231,10 @@ export interface DocumentAdministratif {
   champs_entete: Record<string, any>;
   lignes: Record<string, any>[];
   montant_total: string;
+  piece_jointe?: string | null;
+  document_source: number | null;
+  document_source_numero: string | null;
+  documents_derives_numeros: string[];
   statut: 'EN_COURS' | 'VALIDE' | 'REFUSE';
   statut_libelle: string;
   etape_visa_courante: number;
@@ -227,6 +244,125 @@ export interface DocumentAdministratif {
   peut_viser: boolean;
   date_creation: string;
   date_modification: string;
+}
+
+export type CategorieArticle = 'MATERIEL' | 'INFORMATIQUE' | 'FOURNITURES';
+
+export interface Article {
+  id: number;
+  nom: string;
+  categorie: CategorieArticle;
+  categorie_libelle: string;
+  unite: string;
+  quantite_stock: number;
+  seuil_alerte: number;
+  description: string;
+  actif: boolean;
+  filiale: number;
+  filiale_nom: string;
+  en_alerte: boolean;
+  date_creation: string;
+  date_modification: string;
+}
+
+export interface MouvementStock {
+  id: number;
+  article: number;
+  article_nom: string;
+  type_mouvement: 'ENTREE' | 'SORTIE';
+  type_mouvement_libelle: string;
+  quantite: number;
+  motif: string;
+  utilisateur: number;
+  utilisateur_nom: string;
+  date_creation: string;
+}
+
+export type TypeContrat = 'FOURNISSEUR' | 'CLIENT' | 'PRESTATAIRE' | 'BAIL' | 'AUTRE';
+export type StatutContrat = 'ACTIF' | 'EXPIRE' | 'RESILIE';
+
+export const LIBELLES_TYPE_CONTRAT: Record<TypeContrat, string> = {
+  FOURNISSEUR: 'Contrat fournisseur',
+  CLIENT: 'Contrat client',
+  PRESTATAIRE: 'Prestation de services',
+  BAIL: 'Bail / location',
+  AUTRE: 'Autre',
+};
+
+export interface PieceJointeContrat {
+  id: number;
+  fichier: string;
+  nom_original: string;
+  ajoute_par: number;
+  ajoute_par_nom: string;
+  date_ajout: string;
+}
+
+export interface Contrat {
+  id: number;
+  numero: string;
+  filiale: number;
+  filiale_nom: string;
+  intitule: string;
+  partie_contractante: string;
+  type_contrat: TypeContrat;
+  type_contrat_libelle: string;
+  reference: string;
+  date_debut: string;
+  date_echeance: string | null;
+  jours_avant_echeance: number | null;
+  montant: string | null;
+  description: string;
+  statut: StatutContrat;
+  statut_libelle: string;
+  motif_resiliation: string;
+  date_resiliation: string | null;
+  cree_par: number;
+  cree_par_nom: string;
+  pieces_jointes: PieceJointeContrat[];
+  date_creation: string;
+  date_modification: string;
+}
+
+export interface RapportDocumentsParType {
+  type_document: TypeDocumentAdministratif;
+  type_document_libelle: string;
+  total: number;
+  en_cours: number;
+  valides: number;
+  refuses: number;
+  montant_valide: string;
+}
+
+export interface RapportContrats {
+  actifs: number;
+  expires: number;
+  resilies: number;
+  montant_engage: string;
+  echeances_proches_30j: number;
+}
+
+export interface RapportStocks {
+  mouvements_total: number;
+  quantite_entrees: number;
+  quantite_sorties: number;
+  articles_en_alerte: number;
+}
+
+export interface RapportRepartitionFiliale {
+  filiale: string;
+  filiale_id: number;
+  montant_valide: string;
+}
+
+export interface RapportAdministratif {
+  periode: { date_debut: string; date_fin: string };
+  filiale: string;
+  filiale_id: number | null;
+  documents: { par_type: RapportDocumentsParType[]; total_documents: number; montant_total_valide: string };
+  contrats: RapportContrats;
+  stocks: RapportStocks;
+  repartition_par_filiale?: RapportRepartitionFiliale[];
 }
 
 export interface Paginated<T> {

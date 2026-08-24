@@ -7,6 +7,7 @@ import { AuthService } from '../../core/auth.service';
 import { IconComponent } from '../../shared/icon.component';
 import {
   ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif,
+  StatutLivraison, LIBELLES_STATUT_LIVRAISON,
 } from '../../core/models';
 
 // Champs d'en-tête additionnels selon le type de document (structurels au
@@ -25,7 +26,14 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
     { cle: 'beneficiaire', libelle: 'Bénéficiaire' },
     { cle: 'montant_lettre', libelle: 'Montant (en lettre)' },
   ],
+  BON_COMMANDE: [
+    { cle: 'fournisseur', libelle: 'Fournisseur' },
+    { cle: 'reference', libelle: 'Référence' },
+    { cle: 'delai_livraison', libelle: 'Délai de livraison souhaité' },
+  ],
 };
+
+const STATUTS_LIVRAISON: StatutLivraison[] = ['EN_ATTENTE', 'ENVOYE', 'LIVRE_PARTIEL', 'LIVRE', 'ANNULE'];
 
 @Component({
   selector: 'app-documents',
@@ -36,8 +44,18 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
       <h1>{{ titre }}</h1>
       <p class="sous-titre">{{ documents().length }} document(s)</p>
     </div>
-    <button class="btn cta" (click)="nouveau()"><app-icon name="plus"/> Nouveau</button>
+    @if (config()?.configure) {
+      <button class="btn cta" (click)="nouveau()"><app-icon name="plus"/> Nouveau</button>
+    }
   </div>
+
+  @if (config() && !config()!.configure) {
+    <div class="alerte err anim-entree">
+      <app-icon name="close" [size]="16"/>
+      Ce document n'est pas encore configuré pour votre filiale. Contactez un administrateur
+      (colonnes et circuit de visa à définir depuis l'admin Django).
+    </div>
+  }
 
   @if (erreur()) {
     <div class="alerte err anim-entree"><app-icon name="close" [size]="16"/> {{ erreur() }}</div>
@@ -56,6 +74,20 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
               <input [(ngModel)]="form.champs_entete[champ.cle]" />
             </div>
           }
+        </div>
+      }
+
+      @if (type === 'BON_COMMANDE') {
+        <div class="ligne">
+          <div class="champ">
+            <label>Demande d'achat liée (facultatif)</label>
+            <select [(ngModel)]="form.document_source">
+              <option [ngValue]="null">— Aucune —</option>
+              @for (da of demandesAchatValidees(); track da.id) {
+                <option [ngValue]="da.id">{{ da.numero }}</option>
+              }
+            </select>
+          </div>
         </div>
       }
 
@@ -103,13 +135,23 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
         <span class="badge" [class.validee]="d.statut === 'VALIDE'" [class.rouge]="d.statut === 'REFUSE'" [class.info]="d.statut === 'EN_COURS'">
           {{ d.statut_libelle }}
         </span>
+        <button class="btn secondaire petit" (click)="telechargerPdf(d)" [disabled]="pdfEnCours()">
+          <app-icon name="doc" [size]="13"/> PDF
+        </button>
         <button class="fermer" (click)="selection.set(null)"><app-icon name="close" [size]="14"/></button>
       </div>
 
-      @if (objectKeys(d.champs_entete).length) {
+      @if (d.document_source_numero) {
+        <p class="lien-doc">Émis à partir de la Demande d'achat <strong>{{ d.document_source_numero }}</strong></p>
+      }
+      @if (d.documents_derives_numeros.length) {
+        <p class="lien-doc">Bon(s) de commande émis : <strong>{{ d.documents_derives_numeros.join(', ') }}</strong></p>
+      }
+
+      @if (champsEnteteAffiches(d).length) {
         <div class="champs-lecture">
-          @for (cle of objectKeys(d.champs_entete); track cle) {
-            <div><span class="lib">{{ cle }}</span> {{ d.champs_entete[cle] }}</div>
+          @for (cle of champsEnteteAffiches(d); track cle) {
+            <div><span class="lib">{{ libelleChamp(cle) }}</span> {{ d.champs_entete[cle] }}</div>
           }
         </div>
       }
@@ -160,6 +202,23 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
           </div>
         </div>
       }
+
+      @if (type === 'BON_COMMANDE' && d.statut === 'VALIDE' && peutSuivreLivraison(d)) {
+        <div class="viser-bloc">
+          <h4>Suivi de livraison</h4>
+          <p class="sous-titre">Statut actuel : <strong>{{ libelleStatutLivraison(d) }}</strong></p>
+          <div class="boutons">
+            @for (s of statutsLivraison; track s) {
+              <button
+                class="btn secondaire petit"
+                [disabled]="statutLivraisonEnCours() || d.champs_entete['statut_livraison'] === s"
+                (click)="majStatutLivraison(d, s)">
+                {{ LIBELLES_STATUT_LIVRAISON[s] }}
+              </button>
+            }
+          </div>
+        </div>
+      }
     </div>
   }
 
@@ -197,7 +256,7 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
     .ligne { display: flex; gap: 1rem; margin-bottom: .9rem; }
     .champ { flex: 1; display: flex; flex-direction: column; gap: .3rem; }
     .champ label { font-size: .78rem; font-weight: 600; color: var(--txt-2); }
-    .champ input, textarea { border: 1px solid var(--bord); border-radius: 8px; padding: .5rem .7rem; font-size: .85rem; font-family: inherit; }
+    .champ input, .champ select, textarea { border: 1px solid var(--bord); border-radius: 8px; padding: .5rem .7rem; font-size: .85rem; font-family: inherit; }
     textarea { width: 100%; resize: vertical; }
 
     .tbl-lignes { width: 100%; border-collapse: collapse; margin: .8rem 0; }
@@ -213,7 +272,8 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
     .detail-entete h3 { margin: 0; }
     .fermer { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--txt-3); }
     .champs-lecture { display: flex; flex-wrap: wrap; gap: 1.2rem; margin-bottom: 1rem; font-size: .85rem; }
-    .champs-lecture .lib { color: var(--txt-2); text-transform: capitalize; margin-right: .3rem; }
+    .champs-lecture .lib { color: var(--txt-2); margin-right: .3rem; }
+    .lien-doc { font-size: .85rem; color: var(--txt-2); margin: 0 0 .6rem; }
 
     .visas { display: flex; flex-direction: column; gap: .6rem; margin: .8rem 0; }
     .visa { display: flex; align-items: flex-start; gap: .6rem; padding: .6rem .8rem; border-radius: 9px; border: 1px solid var(--bord); }
@@ -242,9 +302,15 @@ export class DocumentsComponent implements OnInit {
   erreur = signal('');
   envoiEnCours = signal(false);
   visaEnCours = signal(false);
+  pdfEnCours = signal(false);
   commentaireVisa = '';
 
-  form: any = { champs_entete: {}, lignes: [], montant_total: '0.00' };
+  demandesAchatValidees = signal<DocumentAdministratif[]>([]);
+  statutLivraisonEnCours = signal(false);
+  statutsLivraison = STATUTS_LIVRAISON;
+  LIBELLES_STATUT_LIVRAISON = LIBELLES_STATUT_LIVRAISON;
+
+  form: any = { champs_entete: {}, lignes: [], montant_total: '0.00', document_source: null };
 
   constructor(private route: ActivatedRoute, private api: ApiService, public auth: AuthService) {}
 
@@ -257,6 +323,11 @@ export class DocumentsComponent implements OnInit {
     this.titre = this.route.snapshot.data['titre'] || 'Document';
     this.api.configurationDocument(this.type).subscribe((c) => this.config.set(c));
     this.charger();
+
+    if (this.type === 'BON_COMMANDE') {
+      this.api.documents({ type_document: 'DEMANDE_ACHAT', statut: 'VALIDE' })
+        .subscribe((p) => this.demandesAchatValidees.set(p.results));
+    }
 
     // Ouverture directe depuis une notification (?id=...).
     const id = this.route.snapshot.queryParamMap.get('id');
@@ -283,6 +354,7 @@ export class DocumentsComponent implements OnInit {
       champs_entete: {},
       lignes: c ? [this.ligneVide(c)] : [],
       montant_total: '0.00',
+      document_source: null,
     };
     this.erreur.set('');
     this.formVisible.set(true);
@@ -318,7 +390,9 @@ export class DocumentsComponent implements OnInit {
       type_document: this.type,
       champs_entete: this.form.champs_entete,
       lignes: this.form.lignes,
-      montant_total: this.form.montant_total,
+      // montant_total n'est pas envoyé : toujours recalculé côté serveur
+      // à partir des lignes, pour éviter qu'un montant soit falsifié.
+      ...(this.form.document_source ? { document_source: this.form.document_source } : {}),
     }).subscribe({
       next: () => { this.envoiEnCours.set(false); this.formVisible.set(false); this.charger(); },
       error: (e) => {
@@ -349,6 +423,25 @@ export class DocumentsComponent implements OnInit {
     });
   }
 
+  telechargerPdf(d: DocumentAdministratif): void {
+    this.pdfEnCours.set(true);
+    this.api.telechargerDocumentPdf(d.id).subscribe({
+      next: (blob) => {
+        this.pdfEnCours.set(false);
+        const url = window.URL.createObjectURL(blob);
+        const lien = document.createElement('a');
+        lien.href = url;
+        lien.download = `${d.numero}.pdf`;
+        lien.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.pdfEnCours.set(false);
+        this.erreur.set('Impossible de générer le PDF.');
+      },
+    });
+  }
+
   historiqueAffiche(d: DocumentAdministratif) {
     const c = this.config();
     if (!c) return [];
@@ -369,5 +462,44 @@ export class DocumentsComponent implements OnInit {
 
   objectKeys(o: Record<string, any>): string[] {
     return Object.keys(o || {});
+  }
+
+  // "statut_livraison" a son propre panneau dédié (Suivi de livraison) —
+  // ne pas le répéter tel quel (code brut, ex. "LIVRE") parmi les champs
+  // d'en-tête génériques.
+  champsEnteteAffiches(d: DocumentAdministratif): string[] {
+    return this.objectKeys(d.champs_entete).filter((cle) => cle !== 'statut_livraison');
+  }
+
+  libelleChamp(cle: string): string {
+    const trouve = (CHAMPS_ENTETE[this.type] || []).find((c) => c.cle === cle);
+    if (trouve) return trouve.libelle;
+    const mot = cle.replace(/_/g, ' ');
+    return mot.charAt(0).toUpperCase() + mot.slice(1);
+  }
+
+  peutSuivreLivraison(d: DocumentAdministratif): boolean {
+    if (this.auth.aRole('ADMINISTRATEUR', 'DIRECTEUR')) return true;
+    return this.auth.aRole('SECRETAIRE') && this.auth.utilisateur()?.filiale === d.filiale;
+  }
+
+  libelleStatutLivraison(d: DocumentAdministratif): string {
+    const statut = d.champs_entete?.['statut_livraison'] as StatutLivraison | undefined;
+    return statut ? LIBELLES_STATUT_LIVRAISON[statut] : LIBELLES_STATUT_LIVRAISON['EN_ATTENTE'];
+  }
+
+  majStatutLivraison(d: DocumentAdministratif, statut: StatutLivraison): void {
+    this.statutLivraisonEnCours.set(true);
+    this.api.majStatutLivraison(d.id, statut).subscribe({
+      next: (maj) => {
+        this.statutLivraisonEnCours.set(false);
+        this.selection.set(maj);
+        this.charger();
+      },
+      error: (e) => {
+        this.statutLivraisonEnCours.set(false);
+        this.erreur.set(e?.error?.detail || 'Erreur lors de la mise à jour du suivi de livraison.');
+      },
+    });
   }
 }

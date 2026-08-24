@@ -31,8 +31,10 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             "actif",
             "is_active",
             "source_auth",
+            "photo_profil",
+            "signature",
         )
-        read_only_fields = ("id", "is_active", "source_auth")
+        read_only_fields = ("id", "is_active", "source_auth", "photo_profil", "signature")
 
     def get_source_auth(self, obj) -> str:
         """'SSO' si le compte se connecte via Azure AD, 'LOCAL' sinon."""
@@ -110,6 +112,19 @@ class MoiSerializer(UtilisateurSerializer):
             "est_directeur": obj.role == User.Role.DIRECTEUR,
             "est_employe": obj.role == User.Role.EMPLOYE,
         }
+
+
+class MoiEcritureSerializer(serializers.ModelSerializer):
+    """
+    Mise à jour de son propre profil : photo et signature électronique
+    (utilisée pour tracer les visas — cf. applications.documents). Chacun
+    gère sa propre signature ; ni l'admin ni personne d'autre ne l'upload
+    à sa place.
+    """
+
+    class Meta:
+        model = User
+        fields = ("photo_profil", "signature")
 
 
 class ParametreLDAPSerializer(serializers.ModelSerializer):

@@ -36,6 +36,39 @@ class EstDirecteur(BasePermission):
         )
 
 
+class GereLesStocks(BasePermission):
+    """Chef de service, Directeur ou Administrateur — gestion des stocks."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("CHEF_SERVICE", "DIRECTEUR", "ADMINISTRATEUR")
+        )
+
+
+class GereLesContrats(BasePermission):
+    """Chef de service, Directeur ou Administrateur — gestion des contrats."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("CHEF_SERVICE", "DIRECTEUR", "ADMINISTRATEUR")
+        )
+
+
+class GereLesRapports(BasePermission):
+    """Comptable, Directeur ou Administrateur — consultation des rapports administratifs."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role in ("COMPTABLE", "DIRECTEUR", "ADMINISTRATEUR")
+        )
+
+
 class LectureSeulePourTous(BasePermission):
     """
     Lecture autorisée à tout utilisateur authentifié ;

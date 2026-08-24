@@ -1,13 +1,15 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { DialogueService } from '../../core/dialogue.service';
+import { ToastService } from '../../core/toast.service';
 import { Reservation } from '../../core/models';
 import { IconComponent } from '../../shared/icon.component';
 import {
-  GroupeReservations, grouperParSerie, libelleSerie,
+  GroupeReservations, grouperParSerie, libelleSerie, trouverGroupe,
 } from '../../shared/serie.util';
 
 @Component({
@@ -26,7 +28,7 @@ import {
       <table class="tbl">
         <tr><th>Réservant</th><th>Motif</th><th>Salle</th><th>Date</th><th>Horaire</th><th>Précisions</th><th>Actions</th></tr>
         @for (g of enAttente(); track g.premiere.id) {
-          <tr>
+          <tr [id]="'resa-' + g.premiere.id" [class.surlignee]="ligneSurlignee() === g.premiere.id">
             <td>{{ g.premiere.nom_reservant }}<br><small>{{ g.premiere.demandeur_nom }}</small></td>
             <td>{{ g.premiere.motif || '—' }}</td>
             <td>{{ g.premiere.salle_nom }}</td>
@@ -78,7 +80,7 @@ import {
             </tr>
             @if (serieOuverte() === g.premiere.serie) {
               @for (r of g.occurrences; track r.id) {
-                <tr class="occurrence">
+                <tr class="occurrence" [id]="'resa-' + r.id" [class.surlignee]="ligneSurlignee() === r.id">
                   <td><small>↳ occurrence</small></td>
                   <td>{{ r.salle_nom }}</td>
                   <td>{{ r.date_reunion }}</td>
@@ -91,7 +93,7 @@ import {
               }
             }
           } @else {
-            <tr>
+            <tr [id]="'resa-' + g.premiere.id" [class.surlignee]="ligneSurlignee() === g.premiere.id">
               <td>{{ g.premiere.nom_reservant }}</td>
               <td>{{ g.premiere.salle_nom }}</td>
               <td>{{ g.premiere.date_reunion }}</td>
@@ -113,16 +115,43 @@ import {
     .ligne-serie { cursor: pointer; background: #faf9ff; }
     .ligne-serie:hover { background: #f3f0ff; }
     .occurrence { background: #fcfcfd; }
-    .occurrence td:first-child { padding-left: 1.6rem; }`],
+    .occurrence td:first-child { padding-left: 1.6rem; }
+    tr.surlignee { background: #fff7e6 !important; box-shadow: inset 3px 0 0 var(--accent); animation: pulseSurlignee 1.6s ease-out 1; }
+    @keyframes pulseSurlignee { 0% { background: #ffedc2 !important; } 100% { background: #fff7e6 !important; } }`],
 })
 export class ValidationComponent implements OnInit {
   enAttente = signal<GroupeReservations[]>([]);
   validees = signal<GroupeReservations[]>([]);
   serieOuverte = signal<number | null>(null);
+  ligneSurlignee = signal<number | null>(null);
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  constructor(
+    private api: ApiService, private auth: AuthService, private route: ActivatedRoute,
+    private dialogue: DialogueService, private toasts: ToastService,
+  ) {}
 
   ngOnInit(): void { this.charger(); }
+
+  /** Ouverture directe depuis une notification (?id=...) : déplie la série si besoin, surligne et scroll. */
+  private ouvrirDepuisNotif(): void {
+    const id = Number(this.route.snapshot.queryParamMap.get('id'));
+    if (!id) return;
+
+    const gAttente = trouverGroupe(this.enAttente(), id);
+    if (gAttente) {
+      // Table « en attente » : une seule ligne représente tout le groupe (pas d'expansion).
+      this.ligneSurlignee.set(gAttente.premiere.id);
+      setTimeout(() => document.getElementById('resa-' + gAttente.premiere.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+      return;
+    }
+
+    const gValidee = trouverGroupe(this.validees(), id);
+    if (gValidee) {
+      if (gValidee.estSerie) this.serieOuverte.set(gValidee.premiere.serie!);
+      this.ligneSurlignee.set(id);
+      setTimeout(() => document.getElementById('resa-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+    }
+  }
 
   private filtreFiliale(): Record<string, any> {
     const u = this.auth.utilisateur();
@@ -139,9 +168,9 @@ export class ValidationComponent implements OnInit {
   charger(): void {
     const base = this.filtreFiliale();
     this.api.reservations({ ...base, statut: 'EN_ATTENTE', page_size: 200 })
-      .subscribe((p) => this.enAttente.set(grouperParSerie(p.results)));
+      .subscribe((p) => { this.enAttente.set(grouperParSerie(p.results)); this.ouvrirDepuisNotif(); });
     this.api.reservations({ ...base, statut: 'VALIDEE', page_size: 200 })
-      .subscribe((p) => this.validees.set(grouperParSerie(p.results)));
+      .subscribe((p) => { this.validees.set(grouperParSerie(p.results)); this.ouvrirDepuisNotif(); });
   }
 
   basculerSerie(serieId: number): void {
@@ -154,25 +183,45 @@ export class ValidationComponent implements OnInit {
     return g.occurrences.map((o) => o.date_reunion).join(', ');
   }
 
+  private erreurToast(titre: string, e: any): void {
+    this.toasts.afficher({ titre, message: e?.error?.detail || 'Erreur inconnue.', type: 'ERROR' });
+  }
+
   valider(g: GroupeReservations): void {
     forkJoin(g.occurrences.map((o) => this.api.validerReservation(o.id))).subscribe({
       next: () => this.charger(),
-      error: (e) => { alert(e?.error?.detail || 'Erreur.'); this.charger(); },
+      error: (e) => { this.erreurToast('Validation impossible', e); this.charger(); },
     });
   }
 
-  refuser(g: GroupeReservations): void {
-    const motif = prompt('Motif du refus ?') ?? '';
+  async refuser(g: GroupeReservations): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: g.estSerie ? 'Refuser la série' : 'Refuser la demande',
+      message: `${g.premiere.nom_reservant} — ${g.premiere.salle_nom}`,
+      placeholder: 'Motif du refus',
+      libelleConfirmer: 'Refuser',
+      dangereux: true,
+      obligatoire: true,
+    });
+    if (motif === null) return;
     forkJoin(g.occurrences.map((o) => this.api.refuserReservation(o.id, motif))).subscribe({
       next: () => this.charger(),
-      error: (e) => { alert(e?.error?.detail || 'Erreur.'); this.charger(); },
+      error: (e) => { this.erreurToast('Refus impossible', e); this.charger(); },
     });
   }
 
-  annulerRes(r: Reservation): void {
-    const motif = prompt("Motif de l'annulation ? (transmis au demandeur, ex. « le DG a besoin de la salle »)");
+  async annulerRes(r: Reservation): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: "Annuler l'arbitrage",
+      message: `${r.salle_nom} — ${r.date_reunion} (transmis au demandeur, ex. « le DG a besoin de la salle »)`,
+      placeholder: "Motif de l'annulation",
+      libelleConfirmer: 'Annuler',
+      dangereux: true,
+    });
     if (motif === null) return;
-    this.api.annulerReservation(r.id, motif).subscribe({ next: () => this.charger(),
-      error: (e) => alert(e?.error?.detail || 'Erreur.') });
+    this.api.annulerReservation(r.id, motif).subscribe({
+      next: () => this.charger(),
+      error: (e) => this.erreurToast('Annulation impossible', e),
+    });
   }
 }

@@ -7,6 +7,8 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { NotificationsService } from '../../core/notifications.service';
+import { DialogueService } from '../../core/dialogue.service';
+import { ToastService } from '../../core/toast.service';
 import { Salle, Reservation, Filiale } from '../../core/models';
 import { IconComponent } from '../../shared/icon.component';
 import { libelleSerie } from '../../shared/serie.util';
@@ -505,6 +507,8 @@ export class CalendrierComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly notifs = inject(NotificationsService);
+  private readonly dialogue = inject(DialogueService);
+  private readonly toasts = inject(ToastService);
   private timerNow?: ReturnType<typeof setInterval>;
   private lastNotifCount = -1;
 
@@ -632,27 +636,45 @@ export class CalendrierComponent implements OnInit, OnDestroy {
     return r.demandeur === this.auth.utilisateur()?.id;
   }
 
+  private erreurToast(titre: string, e: any): void {
+    this.toasts.afficher({ titre, message: e?.error?.detail || 'Erreur inconnue.', type: 'ERROR' });
+  }
+
   valider(r: Reservation): void {
     this.api.validerReservation(r.id).subscribe({
       next: () => { this.selection.set(null); this.charger(); },
-      error: (e) => alert(e?.error?.detail || 'Erreur.'),
+      error: (e) => this.erreurToast('Validation impossible', e),
     });
   }
 
-  refuser(r: Reservation): void {
-    const motif = prompt('Motif du refus ? (transmis au demandeur)') ?? '';
+  async refuser(r: Reservation): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: 'Refuser la demande',
+      message: `${r.nom_reservant} — ${this.nomSalle(r.salle)}`,
+      placeholder: 'Motif du refus (transmis au demandeur)',
+      libelleConfirmer: 'Refuser',
+      dangereux: true,
+      obligatoire: true,
+    });
+    if (motif === null) return;
     this.api.refuserReservation(r.id, motif).subscribe({
       next: () => { this.selection.set(null); this.charger(); },
-      error: (e) => alert(e?.error?.detail || 'Erreur.'),
+      error: (e) => this.erreurToast('Refus impossible', e),
     });
   }
 
-  annuler(r: Reservation): void {
-    const motif = prompt("Motif de l'annulation ? (transmis au demandeur)");
+  async annuler(r: Reservation): Promise<void> {
+    const motif = await this.dialogue.demanderMotif({
+      titre: 'Annuler la réservation',
+      message: `${r.nom_reservant} — ${this.nomSalle(r.salle)}`,
+      placeholder: "Motif de l'annulation (transmis au demandeur)",
+      libelleConfirmer: 'Annuler',
+      dangereux: true,
+    });
     if (motif === null) return;
     this.api.annulerReservation(r.id, motif).subscribe({
       next: () => { this.selection.set(null); this.charger(); },
-      error: (e) => alert(e?.error?.detail || 'Erreur.'),
+      error: (e) => this.erreurToast('Annulation impossible', e),
     });
   }
 

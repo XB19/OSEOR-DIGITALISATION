@@ -6,14 +6,16 @@ import { ApiService } from '../core/api.service';
 import { NotificationsService } from '../core/notifications.service';
 import { IconComponent } from '../shared/icon.component';
 import { ToastsComponent } from '../shared/toasts.component';
+import { DialogueComponent } from '../shared/dialogue.component';
 import { MODULES_MOYENS_GENERAUX, ModuleMetier, CHEMIN_PAR_TYPE_DOCUMENT } from '../core/modules-metier';
 import { NotificationItem } from '../core/models';
 
 @Component({
   selector: 'app-shell',
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToastsComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToastsComponent, DialogueComponent],
   template: `
   <app-toasts />
+  <app-dialogue />
   <div class="layout">
     <aside class="sidebar">
       <div class="logo">
@@ -62,13 +64,17 @@ import { NotificationItem } from '../core/models';
               <span class="pastille">{{ notifs.nonLues() }}</span>
             }
           </button>
-          <div class="user">
-            <span class="avatar">{{ initiales() }}</span>
+          <a class="user" routerLink="/profil" title="Mon profil">
+            @if (auth.utilisateur()?.photo_profil) {
+              <img class="avatar" [src]="auth.utilisateur()!.photo_profil" alt="" />
+            } @else {
+              <span class="avatar">{{ initiales() }}</span>
+            }
             <div class="user-txt">
               <strong>{{ auth.utilisateur()?.nom_complet }}</strong>
               <small>{{ auth.utilisateur()?.role_libelle }}</small>
             </div>
-          </div>
+          </a>
           <button class="btn secondaire petit" (click)="deconnexion()"><app-icon name="logout" [size]="15"/> Quitter</button>
         </div>
 
@@ -107,8 +113,11 @@ import { NotificationItem } from '../core/models';
     .sidebar {
       width: 248px; background: linear-gradient(180deg, var(--navy) 0%, var(--navy-900) 100%);
       color: #fff; flex-shrink: 0; display: flex; flex-direction: column; padding: 1.2rem 0;
-      position: sticky; top: 0; height: 100vh;
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent;
     }
+    .sidebar::-webkit-scrollbar { width: 6px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); border-radius: 999px; }
     .logo { display: flex; align-items: center; gap: .7rem; padding: 0 1.4rem 1.4rem; }
     .logo-mark { width: 38px; height: 38px; border-radius: 10px; background: var(--accent);
       display: flex; align-items: center; justify-content: center; font-family: var(--police-titre);
@@ -151,9 +160,10 @@ import { NotificationItem } from '../core/models';
     .pastille { position: absolute; top: 4px; right: 4px; background: var(--accent); color: #fff;
       border-radius: 999px; font-size: .66rem; min-width: 16px; height: 16px; padding: 0 4px;
       display: flex; align-items: center; justify-content: center; font-weight: 700; }
-    .user { display: flex; align-items: center; gap: .6rem; }
+    .user { display: flex; align-items: center; gap: .6rem; cursor: pointer; }
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--navy); color: #fff;
-      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .82rem; }
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .82rem;
+      object-fit: cover; flex-shrink: 0; }
     .user-txt { display: flex; flex-direction: column; line-height: 1.15; }
     .user-txt small { color: var(--txt-3); font-size: .76rem; }
     .panneau-notifs {
@@ -207,9 +217,9 @@ export class ShellComponent implements OnInit {
     switch (n.objet_type) {
       case 'Reservation':
         if (this.auth.aRole('SECRETAIRE', 'ADMINISTRATEUR')) {
-          this.router.navigate(['/validation']);
+          this.router.navigate(['/validation'], { queryParams: { id: n.objet_id } });
         } else {
-          this.router.navigate(['/mes-reservations']);
+          this.router.navigate(['/mes-reservations'], { queryParams: { id: n.objet_id } });
         }
         break;
       case 'Audience':
@@ -220,6 +230,12 @@ export class ShellComponent implements OnInit {
           const chemin = CHEMIN_PAR_TYPE_DOCUMENT[d.type_document];
           if (chemin) this.router.navigate([chemin], { queryParams: { id: n.objet_id } });
         });
+        break;
+      case 'Article':
+        this.router.navigate(['/stocks'], { queryParams: { id: n.objet_id } });
+        break;
+      case 'Contrat':
+        this.router.navigate(['/contrats'], { queryParams: { id: n.objet_id } });
         break;
     }
   }

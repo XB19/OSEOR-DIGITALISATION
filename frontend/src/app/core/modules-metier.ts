@@ -23,7 +23,9 @@ export const MODULES_MOYENS_GENERAUX: ModuleMetier[] = [
   },
   {
     lien: '/bons-commande', libelle: 'Bons de commande', icone: 'cart',
-    roles: ['SECRETAIRE', 'DIRECTEUR', 'ADMINISTRATEUR'],
+    // CHEF_SERVICE inclus : c'est lui qui vise l'étape intermédiaire du
+    // circuit de validation (cf. seed_config_documents.py).
+    roles: ['SECRETAIRE', 'CHEF_SERVICE', 'DIRECTEUR', 'ADMINISTRATEUR'],
   },
   {
     lien: '/notes-internes', libelle: 'Notes internes', icone: 'edit',
@@ -64,4 +66,5 @@ export const CHEMIN_PAR_TYPE_DOCUMENT: Record<string, string> = {
   DEMANDE_ACHAT: '/demandes-achat',
   FICHE_TRANSPORT: '/deplacements',
   BON_SORTIE_CAISSE: '/bon-sortie-caisse',
+  BON_COMMANDE: '/bons-commande',
 };

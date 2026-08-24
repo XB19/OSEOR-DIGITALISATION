@@ -10,9 +10,10 @@ def _destinataires_etape(document, etape_config):
     """
     Utilisateurs habilités à viser l'étape donnée : ceux du rôle requis,
     dans la filiale du document (le Directeur/Administrateur peuvent
-    toujours agir en plus, mais ne sont notifiés que lorsque l'étape leur
-    est explicitement destinée, pour éviter de les noyer de notifications
-    routinières).
+    toujours agir en plus, mais ne sont notifiés « à agir » que lorsque
+    l'étape leur est explicitement destinée, pour éviter de les noyer de
+    notifications routinières — ils reçoivent en revanche une notification
+    de suivi sur chaque document, voir `_notifier_admins_suivi`).
     """
     role_requis = etape_config.get("role")
     if not role_requis:
@@ -20,11 +21,22 @@ def _destinataires_etape(document, etape_config):
     return User.objects.filter(filiale=document.filiale, role=role_requis, is_active=True)
 
 
+def _notifier_admins_suivi(document, titre, message, exclure_ids=()):
+    """
+    L'administrateur voit passer chaque étape de chaque document, pour le
+    suivi global — même quand ce n'est pas à lui d'agir dessus (EF-20 bis).
+    """
+    admins = User.objects.filter(role="ADMINISTRATEUR", is_active=True).exclude(pk__in=exclure_ids)
+    for admin in admins:
+        envoyer_notification(admin, titre, message, "INFO", objet=document)
+
+
 def notifier_etape_courante(document, config):
     """
     Notifie les utilisateurs habilités à viser l'étape en cours — à appeler
     après la création d'un document, et après chaque visa qui fait avancer
-    la chaîne sans la clôturer.
+    la chaîne sans la clôturer. Notifie aussi les administrateurs, pour
+    suivi, qu'ils soient ou non habilités à viser cette étape.
     """
     if document.statut != Document.Statut.EN_COURS:
         return
@@ -32,7 +44,8 @@ def notifier_etape_courante(document, config):
         return
 
     etape = config.visas[document.etape_visa_courante]
-    for destinataire in _destinataires_etape(document, etape):
+    destinataires = list(_destinataires_etape(document, etape))
+    for destinataire in destinataires:
         envoyer_notification(
             destinataire,
             f"{document.get_type_document_display()} en attente de votre visa",
@@ -41,9 +54,17 @@ def notifier_etape_courante(document, config):
             objet=document,
         )
 
+    exclure_ids = [document.demandeur_id] + [d.id for d in destinataires]
+    _notifier_admins_suivi(
+        document,
+        f"Suivi — {document.get_type_document_display()}",
+        f"{document.numero} ({document.demandeur.nom_complet}) — étape en cours : {etape.get('libelle')}.",
+        exclure_ids=exclure_ids,
+    )
+
 
 def notifier_decision_finale(document, decision, commentaire=""):
-    """Notifie le demandeur quand son document est entièrement validé ou refusé."""
+    """Notifie le demandeur (et les administrateurs, pour suivi) de l'issue finale."""
     if decision == "REFUSE":
         envoyer_notification(
             document.demandeur,
@@ -52,6 +73,8 @@ def notifier_decision_finale(document, decision, commentaire=""):
             "ERROR",
             objet=document,
         )
+        titre_suivi = f"Suivi — {document.get_type_document_display()} refusé"
+        message_suivi = f"{document.numero} ({document.demandeur.nom_complet}) a été refusé."
     else:
         envoyer_notification(
             document.demandeur,
@@ -60,3 +83,7 @@ def notifier_decision_finale(document, decision, commentaire=""):
             "SUCCESS",
             objet=document,
         )
+        titre_suivi = f"Suivi — {document.get_type_document_display()} validé"
+        message_suivi = f"{document.numero} ({document.demandeur.nom_complet}) a été entièrement validé."
+
+    _notifier_admins_suivi(document, titre_suivi, message_suivi, exclure_ids=[document.demandeur_id])
