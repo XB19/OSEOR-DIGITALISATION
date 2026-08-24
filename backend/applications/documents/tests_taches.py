@@ -8,6 +8,7 @@ qui rend la chaîne complète vérifiable sans Redis ni worker.
 """
 
 import json
+from unittest import mock
 from datetime import timedelta
 from io import StringIO
 
@@ -23,6 +24,16 @@ from applications.documents.tasks import (
 )
 from applications.documents.tests import BaseDocuments
 from applications.notifications.models import Notification
+
+#: Déclaration synthétique : vérifie le mécanisme de planification sans
+#: dépendre d'une tâche métier, qui peut être replanifiée ou retirée.
+TACHE_ANNUELLE = {
+    "nom": "Tâche annuelle de contrôle",
+    "tache": "tests.tache_annuelle",
+    "crontab": {"minute": "30", "hour": "23", "day_of_month": "31",
+                "month_of_year": "12"},
+    "description": "Exemple de tâche à date fixe.",
+}
 
 
 class RelanceDesVisasTests(BaseDocuments, TestCase):
@@ -114,15 +125,25 @@ class SeedTachesPlanifieesTests(TestCase):
 
     def test_horaire_annuel_conserve_jour_et_mois(self):
         """
-        Regression : `get_or_create` applique ses `defaults` PAR-DESSUS les
+        Régression : `get_or_create` applique ses `defaults` PAR-DESSUS les
         critères de recherche. Un `defaults={"day_of_month": "*"}` écrasait
-        le 31/12 de l'expiration des congés, qui se retrouvait planifiée
-        toutes les nuits — et vidait le solde de tout le personnel chaque
-        soir.
-        """
-        call_command("seed_taches_planifiees", stdout=StringIO())
+        le jour et le mois d'une tâche annuelle, qui se retrouvait planifiée
+        toutes les nuits.
 
-        tache = PeriodicTask.objects.get(name="Expiration des soldes de congés")
+        Le cas s'était produit sur l'expiration des soldes de congés, qui
+        aurait vidé le compteur de tout le personnel chaque soir. La tâche
+        n'est plus planifiée depuis que les congés se cumulent : le test
+        s'appuie donc sur une déclaration synthétique, pour vérifier le
+        mécanisme sans dépendre d'une décision métier.
+        """
+        with mock.patch(
+            "applications.planification.management.commands"
+            ".seed_taches_planifiees.collecter_taches",
+            return_value=[TACHE_ANNUELLE],
+        ):
+            call_command("seed_taches_planifiees", stdout=StringIO())
+
+        tache = PeriodicTask.objects.get(name=TACHE_ANNUELLE["nom"])
 
         self.assertEqual(tache.crontab.day_of_month, "31")
         self.assertEqual(tache.crontab.month_of_year, "12")
@@ -166,11 +187,17 @@ class ReinitialisationHorairesTests(TestCase):
     D'où l'option explicite.
     """
 
-    NOM = "Expiration des soldes de congés"
+    def _seed(self, **options):
+        with mock.patch(
+            "applications.planification.management.commands"
+            ".seed_taches_planifiees.collecter_taches",
+            return_value=[TACHE_ANNUELLE],
+        ):
+            call_command("seed_taches_planifiees", stdout=StringIO(), **options)
 
     def _fausser_horaire(self):
-        call_command("seed_taches_planifiees", stdout=StringIO())
-        tache = PeriodicTask.objects.get(name=self.NOM)
+        self._seed()
+        tache = PeriodicTask.objects.get(name=TACHE_ANNUELLE["nom"])
         faux = CrontabSchedule.objects.create(
             minute="30", hour="23", day_of_month="*", month_of_year="*",
             day_of_week="*")
@@ -181,18 +208,16 @@ class ReinitialisationHorairesTests(TestCase):
     def test_sans_option_l_horaire_errone_persiste(self):
         self._fausser_horaire()
 
-        call_command("seed_taches_planifiees", stdout=StringIO())
+        self._seed()
 
-        tache = PeriodicTask.objects.get(name=self.NOM)
+        tache = PeriodicTask.objects.get(name=TACHE_ANNUELLE["nom"])
         self.assertEqual(tache.crontab.day_of_month, "*")
 
     def test_option_remet_l_horaire_declare(self):
         self._fausser_horaire()
 
-        call_command(
-            "seed_taches_planifiees", reinitialiser_horaires=True,
-            stdout=StringIO())
+        self._seed(reinitialiser_horaires=True)
 
-        tache = PeriodicTask.objects.get(name=self.NOM)
+        tache = PeriodicTask.objects.get(name=TACHE_ANNUELLE["nom"])
         self.assertEqual(tache.crontab.day_of_month, "31")
         self.assertEqual(tache.crontab.month_of_year, "12")
