@@ -7,7 +7,7 @@ import { NotificationsService } from '../core/notifications.service';
 import { IconComponent } from '../shared/icon.component';
 import { ToastsComponent } from '../shared/toasts.component';
 import { DialogueComponent } from '../shared/dialogue.component';
-import { MODULES_MOYENS_GENERAUX, ModuleMetier, CHEMIN_PAR_TYPE_DOCUMENT } from '../core/modules-metier';
+import { MODULES_MOYENS_GENERAUX, MODULES_VIE_INTERNE, ModuleMetier, CHEMIN_PAR_TYPE_DOCUMENT } from '../core/modules-metier';
 import { NotificationItem } from '../core/models';
 
 @Component({
@@ -34,6 +34,11 @@ import { NotificationItem } from '../core/models';
           <a routerLink="/salles" routerLinkActive="actif"><app-icon name="building"/> Salles</a>
         }
         <a routerLink="/audiences" routerLinkActive="actif"><app-icon name="users"/> Audiences</a>
+
+        <div class="nav-titre">Vie interne</div>
+        @for (m of MODULES_VIE_INTERNE; track m.lien) {
+          <a [routerLink]="m.lien" routerLinkActive="actif"><app-icon [name]="m.icone"/> {{ m.libelle }}</a>
+        }
 
         @if (modulesVisibles().length) {
           <div class="nav-titre">Moyens généraux</div>
@@ -207,6 +212,9 @@ export class ShellComponent implements OnInit {
   modulesVisibles(): ModuleMetier[] {
     return MODULES_MOYENS_GENERAUX.filter((m) => !m.roles || this.auth.aRole(...m.roles));
   }
+
+  /** Ouverts à tous : chacun pose ses congés et consulte la galerie. */
+  protected readonly MODULES_VIE_INTERNE = MODULES_VIE_INTERNE;
 
   /** Marque la notification lue puis navigue vers l'élément concerné, s'il y en a un. */
   ouvrirNotif(n: NotificationItem): void {

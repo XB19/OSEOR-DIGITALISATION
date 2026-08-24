@@ -5,10 +5,11 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { IconComponent } from '../../shared/icon.component';
 import { MODULES_MOYENS_GENERAUX, ModuleMetier } from '../../core/modules-metier';
+import { GalerieDefilanteComponent } from '../../shared/galerie-defilante.component';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule, RouterLink, IconComponent],
+  imports: [CommonModule, RouterLink, IconComponent, GalerieDefilanteComponent],
   template: `
   <div class="tete anim-entree">
     <div>
@@ -48,7 +49,9 @@ import { MODULES_MOYENS_GENERAUX, ModuleMetier } from '../../core/modules-metier
       }
     </div>
 
-    <div class="deux">
+    <div class="avec-galerie">
+     <div class="colonne-principale">
+      <div class="deux">
       <div class="carte anim-entree">
         <h3>Salles les plus demandées</h3>
         @if (s.salles_plus_demandees?.length) {
@@ -77,16 +80,22 @@ import { MODULES_MOYENS_GENERAUX, ModuleMetier } from '../../core/modules-metier
       </div>
     </div>
 
-    @if (outilsVisibles().length) {
-      <div class="carte anim-entree outils-carte">
-        <h3>Vos outils</h3>
-        <div class="outils-grille">
-          @for (o of outilsVisibles(); track o.lien) {
-            <a class="outil" [routerLink]="o.lien"><app-icon [name]="o.icone" [size]="18"/> {{ o.libelle }}</a>
-          }
+      @if (outilsVisibles().length) {
+        <div class="carte anim-entree outils-carte">
+          <h3>Vos outils</h3>
+          <div class="outils-grille">
+            @for (o of outilsVisibles(); track o.lien) {
+              <a class="outil" [routerLink]="o.lien"><app-icon [name]="o.icone" [size]="18"/> {{ o.libelle }}</a>
+            }
+          </div>
         </div>
-      </div>
-    }
+      }
+     </div>
+
+     <aside class="colonne-galerie">
+       <app-galerie-defilante/>
+     </aside>
+    </div>
   } @else {
     <div class="grille">
       @for (i of [1,2,3,4]; track i) { <div class="kpi"><div class="skeleton" style="width:100%;height:54px"></div></div> }
@@ -107,6 +116,16 @@ import { MODULES_MOYENS_GENERAUX, ModuleMetier } from '../../core/modules-metier
     .ic-orange { background: var(--accent); } .ic-vert { background: var(--vert); }
     .kpi .v { font-family: var(--police-titre); font-size: 1.7rem; font-weight: 700; color: var(--navy); line-height: 1; }
     .kpi .l { font-size: .8rem; color: var(--txt-2); margin-top: .25rem; }
+    /* Colonne latérale pour la galerie. Elle vient APRÈS le contenu dans
+       le flux : sur mobile, le tableau de bord reste en tête et le
+       bandeau photo passe dessous, sans jamais repousser l'essentiel. */
+    .avec-galerie { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
+    .colonne-principale { min-width: 0; }
+    .colonne-galerie { position: sticky; top: 1rem; }
+    @media (max-width: 1100px) {
+      .avec-galerie { grid-template-columns: 1fr; }
+      .colonne-galerie { position: static; }
+    }
     .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 820px) { .deux { grid-template-columns: 1fr; } }
     .barres { display: flex; flex-direction: column; gap: .8rem; margin-top: .8rem; }

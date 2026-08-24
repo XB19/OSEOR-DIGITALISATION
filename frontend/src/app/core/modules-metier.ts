@@ -57,6 +57,20 @@ export const MODULES_MOYENS_GENERAUX: ModuleMetier[] = [
   },
 ];
 
+/**
+ * Modules « vie interne » : congés, événements, mémoire du groupe.
+ *
+ * Ouverts à tous les utilisateurs connectés — chacun pose ses congés,
+ * consulte les événements et dépose des photos. Ils sont listés à part des
+ * « Moyens Généraux », qui relèvent d'un circuit administratif, pour que la
+ * navigation distingue les deux familles.
+ */
+export const MODULES_VIE_INTERNE: ModuleMetier[] = [
+  { lien: '/conges', libelle: 'Congés et permissions', icone: 'sun' },
+  { lien: '/evenements', libelle: 'Événements', icone: 'gift' },
+  { lien: '/galerie', libelle: 'Mémoire / Galerie', icone: 'image' },
+];
+
 // Modules déjà implémentés (moteur générique de documents administratifs) :
 // chemin -> type de document côté API. Source unique utilisée par les
 // routes (app.routes.ts) et par la navigation au clic sur une notification

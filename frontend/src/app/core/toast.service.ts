@@ -28,4 +28,17 @@ export class ToastService {
   retirer(id: number): void {
     this.toasts.update((l) => l.filter((x) => x.id !== id));
   }
+
+  /** Raccourcis : la grande majorité des appels sont un succès ou une erreur. */
+  succes(message: string, titre = 'Succès'): void {
+    this.afficher({ titre, message, type: 'SUCCESS' });
+  }
+
+  erreur(message: string, titre = 'Erreur'): void {
+    this.afficher({ titre, message, type: 'ERROR' });
+  }
+
+  info(message: string, titre = 'Information'): void {
+    this.afficher({ titre, message, type: 'INFO' });
+  }
 }

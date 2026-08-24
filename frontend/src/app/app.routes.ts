@@ -115,6 +115,27 @@ export const routes: Routes = [
           import('./pages/administration/administration.component').then((m) => m.AdministrationComponent),
       },
       {
+        path: 'conges',
+        loadComponent: () =>
+          import('./pages/conges/conges.component').then((m) => m.CongesComponent),
+      },
+      {
+        path: 'evenements',
+        loadComponent: () =>
+          import('./pages/evenements/evenements.component').then((m) => m.EvenementsComponent),
+      },
+      {
+        path: 'galerie',
+        loadComponent: () =>
+          import('./pages/galerie/galerie.component').then((m) => m.GalerieComponent),
+      },
+      {
+        path: 'prestations-services',
+        canActivate: [roleGuard('CHEF_SERVICE', 'DIRECTEUR', 'ADMINISTRATEUR')],
+        loadComponent: () =>
+          import('./pages/prestations/prestations.component').then((m) => m.PrestationsComponent),
+      },
+      {
         path: 'profil',
         loadComponent: () =>
           import('./pages/profil/profil.component').then((m) => m.ProfilComponent),
