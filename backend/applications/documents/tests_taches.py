@@ -14,7 +14,7 @@ from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
-from django_celery_beat.models import PeriodicTask
+from django_celery_beat.models import CrontabSchedule, PeriodicTask
 
 from applications.documents.models import Document
 from applications.documents.services import rappeler_documents_en_attente
@@ -109,6 +109,35 @@ class SeedTachesPlanifieesTests(TestCase):
             1,
         )
 
+    def test_horaire_annuel_conserve_jour_et_mois(self):
+        """
+        Regression : `get_or_create` applique ses `defaults` PAR-DESSUS les
+        critères de recherche. Un `defaults={"day_of_month": "*"}` écrasait
+        le 31/12 de l'expiration des congés, qui se retrouvait planifiée
+        toutes les nuits — et vidait le solde de tout le personnel chaque
+        soir.
+        """
+        call_command("seed_taches_planifiees", stdout=StringIO())
+
+        tache = PeriodicTask.objects.get(name="Expiration des soldes de congés")
+
+        self.assertEqual(tache.crontab.day_of_month, "31")
+        self.assertEqual(tache.crontab.month_of_year, "12")
+        self.assertEqual(tache.crontab.hour, "23")
+
+    def test_chaque_tache_a_l_horaire_declare(self):
+        """Aucun champ de crontab déclaré ne doit se perdre au passage."""
+        from applications.planification.registre import collecter_taches
+
+        call_command("seed_taches_planifiees", stdout=StringIO())
+
+        for declaration in collecter_taches():
+            with self.subTest(tache=declaration["nom"]):
+                horaire = PeriodicTask.objects.get(
+                    name=declaration["nom"]).crontab
+                for champ, valeur in declaration["crontab"].items():
+                    self.assertEqual(getattr(horaire, champ), valeur)
+
     def test_preserve_un_horaire_ajuste_a_la_main(self):
         """
         Tout l'intérêt du DatabaseScheduler : un administrateur décale le
@@ -125,3 +154,42 @@ class SeedTachesPlanifieesTests(TestCase):
 
         tache.refresh_from_db()
         self.assertEqual(tache.crontab.hour, "17")
+
+
+class ReinitialisationHorairesTests(TestCase):
+    """
+    Le seed préserve les horaires réglés depuis l'admin — c'est voulu, mais
+    cela empêche aussi de réparer une planification enregistrée de travers.
+    D'où l'option explicite.
+    """
+
+    NOM = "Expiration des soldes de congés"
+
+    def _fausser_horaire(self):
+        call_command("seed_taches_planifiees", stdout=StringIO())
+        tache = PeriodicTask.objects.get(name=self.NOM)
+        faux = CrontabSchedule.objects.create(
+            minute="30", hour="23", day_of_month="*", month_of_year="*",
+            day_of_week="*")
+        tache.crontab = faux
+        tache.save(update_fields=["crontab"])
+        return tache
+
+    def test_sans_option_l_horaire_errone_persiste(self):
+        self._fausser_horaire()
+
+        call_command("seed_taches_planifiees", stdout=StringIO())
+
+        tache = PeriodicTask.objects.get(name=self.NOM)
+        self.assertEqual(tache.crontab.day_of_month, "*")
+
+    def test_option_remet_l_horaire_declare(self):
+        self._fausser_horaire()
+
+        call_command(
+            "seed_taches_planifiees", reinitialiser_horaires=True,
+            stdout=StringIO())
+
+        tache = PeriodicTask.objects.get(name=self.NOM)
+        self.assertEqual(tache.crontab.day_of_month, "31")
+        self.assertEqual(tache.crontab.month_of_year, "12")

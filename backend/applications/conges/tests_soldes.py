@@ -286,3 +286,51 @@ class ExpirationTests(BaseSoldes, TestCase):
         self.assertEqual(services.expirer_solde(vide, 2026), Decimal("0"))
         self.assertFalse(
             MouvementConge.objects.filter(utilisateur=vide).exists())
+
+
+class GardeFouExpirationTests(BaseSoldes, TestCase):
+    """
+    L'expiration est destructrice : elle vérifie elle-même la date plutôt
+    que de faire confiance à son ordonnanceur.
+    """
+
+    def setUp(self):
+        self.creer_donnees()
+        services.crediter_acquisitions(self.salarie, date(2026, 12, 20))
+
+    def test_refuse_d_agir_hors_du_31_decembre(self):
+        from unittest import mock
+        from applications.conges.tasks import expirer_soldes
+
+        with mock.patch(
+            "applications.conges.tasks.timezone.localdate",
+            return_value=date(2026, 6, 15),
+        ):
+            resultat = expirer_soldes()
+
+        self.assertIn("ignoree", resultat)
+        self.assertEqual(services.solde(self.salarie, 2026), Decimal("7.5"))
+
+    def test_agit_le_31_decembre(self):
+        from unittest import mock
+        from applications.conges.tasks import expirer_soldes
+
+        with mock.patch(
+            "applications.conges.tasks.timezone.localdate",
+            return_value=date(2026, 12, 31),
+        ):
+            expirer_soldes()
+
+        self.assertEqual(services.solde(self.salarie, 2026), Decimal("0"))
+
+    def test_forcage_manuel_possible(self):
+        from unittest import mock
+        from applications.conges.tasks import expirer_soldes
+
+        with mock.patch(
+            "applications.conges.tasks.timezone.localdate",
+            return_value=date(2026, 6, 15),
+        ):
+            expirer_soldes(forcer=True)
+
+        self.assertEqual(services.solde(self.salarie, 2026), Decimal("0"))

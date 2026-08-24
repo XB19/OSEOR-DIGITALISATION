@@ -19,9 +19,34 @@ from django_celery_beat.models import CrontabSchedule, PeriodicTask
 
 from applications.planification.registre import collecter_taches
 
+#: Champs d'un crontab, tous à « * » par défaut.
+#:
+#: Ils sont TOUS passés en critère de recherche, jamais via `defaults` :
+#: `get_or_create` applique les `defaults` PAR-DESSUS les critères à la
+#: création, si bien qu'un `defaults={"day_of_month": "*"}` écrasait
+#: silencieusement un `day_of_month="31"` explicite. L'expiration des
+#: congés, seule tâche à préciser un jour et un mois, se retrouvait
+#: programmée toutes les nuits — et vidait le solde de tout le personnel
+#: chaque soir.
+CRONTAB_COMPLET = {
+    "minute": "*",
+    "hour": "*",
+    "day_of_month": "*",
+    "month_of_year": "*",
+    "day_of_week": "*",
+}
+
 
 class Command(BaseCommand):
     help = "Enregistre les tâches planifiées déclarées par les applications."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--reinitialiser-horaires", action="store_true",
+            help="Remet les horaires aux valeurs déclarées dans le code, en "
+                 "écrasant les réglages faits depuis l'admin. À n'utiliser "
+                 "que pour réparer une planification erronée.",
+        )
 
     def handle(self, *args, **options):
         taches = collecter_taches()
@@ -31,12 +56,11 @@ class Command(BaseCommand):
             return
 
         for definition in taches:
-            self._enregistrer(definition)
+            self._enregistrer(definition, options["reinitialiser_horaires"])
 
-    def _enregistrer(self, definition):
+    def _enregistrer(self, definition, reinitialiser=False):
         horaire, _ = CrontabSchedule.objects.get_or_create(
-            **definition["crontab"],
-            defaults={"day_of_month": "*", "month_of_year": "*"},
+            **{**CRONTAB_COMPLET, **definition["crontab"]},
         )
 
         tache, cree = PeriodicTask.objects.get_or_create(
@@ -54,8 +78,21 @@ class Command(BaseCommand):
             return
 
         # La tâche existe : on remet à jour ce qui vient du code, mais on
-        # laisse l'horaire tel que l'administrateur l'a réglé.
+        # laisse l'horaire tel que l'administrateur l'a réglé — sauf demande
+        # explicite de réinitialisation, seul moyen de réparer une
+        # planification déjà enregistrée de travers.
         tache.task = definition["tache"]
         tache.description = definition.get("description", "")
-        tache.save(update_fields=["task", "description"])
+        champs = ["task", "description"]
+
+        if reinitialiser and tache.crontab_id != horaire.pk:
+            ancien = tache.crontab
+            tache.crontab = horaire
+            champs.append("crontab")
+            tache.save(update_fields=champs)
+            self.stdout.write(self.style.WARNING(
+                f"Horaire réinitialisé : {tache.name} ({ancien} -> {horaire})"))
+            return
+
+        tache.save(update_fields=champs)
         self.stdout.write(f"Inchangée (horaire préservé) : {tache.name}")

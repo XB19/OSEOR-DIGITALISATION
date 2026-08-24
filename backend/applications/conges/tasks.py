@@ -1,6 +1,7 @@
 """Tâches planifiées du module Congés."""
 
 from celery import shared_task
+from django.utils import timezone
 
 from . import services
 
@@ -20,8 +21,23 @@ def crediter_acquisitions():
 
 
 @shared_task(name="conges.expirer_soldes")
-def expirer_soldes():
-    """Purge les soldes non pris au 31 décembre (règle RH : jours perdus)."""
+def expirer_soldes(forcer=False):
+    """
+    Purge les soldes non pris au 31 décembre (règle RH : jours perdus).
+
+    Refuse d'agir un autre jour, même si l'ordonnanceur la déclenche : une
+    planification erronée a déjà programmé cette tâche toutes les nuits, et
+    elle aurait vidé le solde de tout le personnel chaque soir. L'opération
+    étant destructrice, elle vérifie elle-même la date plutôt que de faire
+    confiance à son appelant.
+
+    `forcer=True` permet une clôture manuelle hors du 31 décembre.
+    """
+    aujourdhui = timezone.localdate()
+
+    if not forcer and (aujourdhui.month, aujourdhui.day) != (12, 31):
+        return f"ignoree : {aujourdhui:%d/%m} n'est pas le 31/12"
+
     return str(services.expirer_tous_les_soldes())
 
 
