@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from rest_framework import serializers
 
+from config.permissions import est_direction
 from .models import Document, ConfigurationDocument, TypeDocument
 
 _TYPE_COURT = {
@@ -12,6 +13,7 @@ _TYPE_COURT = {
     TypeDocument.FICHE_TRANSPORT: "FT",
     TypeDocument.BON_SORTIE_CAISSE: "BSC",
     TypeDocument.BON_COMMANDE: "BC",
+    TypeDocument.NOTE_INTERNE: "NI",
 }
 
 
@@ -123,7 +125,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         if not etape:
             return False
         u = request.user
-        if u.role in ("ADMINISTRATEUR", "DIRECTEUR"):
+        if est_direction(u):
             return True
         return bool(etape.get("role")) and u.role == etape["role"]
 

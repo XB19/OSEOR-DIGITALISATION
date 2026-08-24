@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class PlanificationConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'applications.planification'
+    verbose_name = "Planification"

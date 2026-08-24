@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from applications.notifications.services import envoyer_notification
 from .models import Document
@@ -87,3 +90,37 @@ def notifier_decision_finale(document, decision, commentaire=""):
         message_suivi = f"{document.numero} ({document.demandeur.nom_complet}) a été entièrement validé."
 
     _notifier_admins_suivi(document, titre_suivi, message_suivi, exclure_ids=[document.demandeur_id])
+
+
+def rappeler_documents_en_attente(seuil_jours=3):
+    """
+    Relance les visas dormants : tout document encore EN_COURS qui n'a pas
+    bougé depuis `seuil_jours` renotifie les personnes habilitées à viser
+    son étape courante.
+
+    C'est le point faible du zéro-papier : une fiche papier posée sur un
+    bureau finit par se voir, un document en base attend indéfiniment que
+    quelqu'un pense à ouvrir la page. Renvoyé par la tâche planifiée
+    correspondante.
+
+    Idempotente : ne modifie aucun document, se contente de renotifier.
+    Relancer la tâche deux fois n'envoie que des notifications en double,
+    jamais de corruption d'état.
+    """
+    limite = timezone.now() - timedelta(days=seuil_jours)
+
+    documents = (
+        Document.objects
+        .filter(statut=Document.Statut.EN_COURS, date_modification__lt=limite)
+        .select_related("filiale", "demandeur")
+    )
+
+    relances = 0
+    for document in documents:
+        config = document.configuration()
+        if not config or not config.visas:
+            continue
+        notifier_etape_courante(document, config)
+        relances += 1
+
+    return relances

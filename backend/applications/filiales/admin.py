@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Filiale, ParametreFiliale
+from .models import Filiale, ParametreFiliale, Service
 
 
 @admin.register(Filiale)
@@ -41,4 +41,31 @@ class ParametreFilialeAdmin(admin.ModelAdmin):
 
     list_filter = (
         "filiale",
+    )
+
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "nom",
+        "code",
+        "filiale",
+        "chef",
+        "actif",
+    )
+
+    search_fields = (
+        "nom",
+        "code",
+        "filiale__nom",
+    )
+
+    list_filter = (
+        "filiale",
+        "actif",
+    )
+
+    autocomplete_fields = (
+        "chef",
     )

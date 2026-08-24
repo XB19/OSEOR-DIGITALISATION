@@ -42,6 +42,14 @@ INSTALLED_APPS = [
     'daphne',
     'channels',
 
+    'django_celery_beat',
+
+    'applications.conges',
+    'applications.evenements',
+    'applications.galerie',
+    'applications.notes',
+    'applications.planification',
+    'applications.prestations',
     'applications.tableau_bord',
     'applications.documents',
     'applications.stocks',
@@ -177,11 +185,44 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'fr-fr'
 
+
 TIME_ZONE = 'Africa/Lome'
 
 USE_I18N = True
 
 USE_TZ = True
+
+
+# =====================================================================
+# Celery — traitements planifiés et differes
+# =====================================================================
+
+# Sans Redis, Celery bascule sur un broker mémoire : les tâches appelées
+# avec .delay() sont alors exécutées immédiatement, dans le processus
+# appelant. Pratique en développement, jamais en production.
+CELERY_BROKER_URL = REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = REDIS_URL or "cache+memory://"
+CELERY_TASK_ALWAYS_EAGER = not REDIS_URL
+CELERY_TASK_EAGER_PROPAGATES = True
+
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+
+# Horaires stockés en base et modifiables depuis l'admin Django.
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# Un accusé de réception après exécution (et non avant) : si un worker meurt
+# en plein traitement, la tâche est reprise plutôt que perdue. Les tâches
+# doivent donc rester idempotentes — une acquisition de congés relancée ne
+# doit pas créditer deux fois.
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# Garde-fous : une tâche qui part en boucle est arrêtée plutôt que de
+# monopoliser un worker.
+CELERY_TASK_SOFT_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 360
+
 
 
 # Static files (CSS, JavaScript, Images)
@@ -334,4 +375,7 @@ if "test" in sys.argv:
         "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
     }
     EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CELERY_BROKER_URL = "memory://"
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

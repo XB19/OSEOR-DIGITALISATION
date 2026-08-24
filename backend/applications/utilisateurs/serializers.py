@@ -7,11 +7,24 @@ User = get_user_model()
 
 
 class UtilisateurSerializer(serializers.ModelSerializer):
-    """Lecture d'un utilisateur (annuaire, profil)."""
+    """
+    Lecture d'un utilisateur (annuaire).
+
+    Lisible par TOUT utilisateur authentifié : n'y exposer que ce qui a sa
+    place dans un trombinoscope. `date_naissance` et `date_embauche` en
+    sont volontairement absentes — elles révéleraient l'âge et
+    l'ancienneté de chaque collègue du groupe. Elles restent visibles sur
+    son propre profil (`MoiSerializer`) et modifiables par
+    l'administrateur.
+    """
 
     nom_complet = serializers.CharField(read_only=True)
     role_libelle = serializers.CharField(source="get_role_display", read_only=True)
     filiale_nom = serializers.CharField(source="filiale.nom", read_only=True, default=None)
+    service_nom = serializers.CharField(source="service.nom", read_only=True, default=None)
+    responsable_nom = serializers.CharField(
+        source="responsable_hierarchique.nom_complet", read_only=True, default=None,
+    )
     source_auth = serializers.SerializerMethodField()
 
     class Meta:
@@ -28,6 +41,10 @@ class UtilisateurSerializer(serializers.ModelSerializer):
             "role_libelle",
             "filiale",
             "filiale_nom",
+            "service",
+            "service_nom",
+            "responsable_hierarchique",
+            "responsable_nom",
             "actif",
             "is_active",
             "source_auth",
@@ -60,8 +77,12 @@ class UtilisateurEcritureSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
             "telephone",
+            "date_naissance",
+            "date_embauche",
             "role",
             "filiale",
+            "service",
+            "responsable_hierarchique",
             "actif",
             "password",
         )
@@ -103,7 +124,9 @@ class MoiSerializer(UtilisateurSerializer):
     permissions = serializers.SerializerMethodField()
 
     class Meta(UtilisateurSerializer.Meta):
-        fields = UtilisateurSerializer.Meta.fields + ("permissions",)
+        fields = UtilisateurSerializer.Meta.fields + (
+            "date_naissance", "date_embauche", "permissions",
+        )
 
     def get_permissions(self, obj):
         return {

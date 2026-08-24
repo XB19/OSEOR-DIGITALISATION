@@ -15,6 +15,9 @@ x-django-env: &django-env
   DB_SSLMODE: disable
   REDIS_URL: redis://redis:6379/0
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+  # Ecoute sur toutes les interfaces du conteneur : lie a 127.0.0.1, le
+  # service ne serait joignable ni par nginx ni par le port publie.
+  API_HOST: 0.0.0.0
 
 services:
   db:
@@ -66,12 +69,46 @@ services:
     ports:
       - "8001:8001"
 
+  # Worker Celery : execute les traitements planifies (relance des visas,
+  # a venir : acquisition des conges, alertes de stock, expiration des
+  # contrats). Sans lui, les taches sont mises en file et jamais traitees.
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+    command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      - api
+      - redis
+    volumes:
+      - media_data:/app/media
+
+  # Ordonnanceur Celery : declenche les taches a l'heure dite. Les horaires
+  # sont lus en base (django-celery-beat) et modifiables depuis l'admin.
+  # Un SEUL exemplaire doit tourner, sinon chaque tache part en double.
+  beat:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      <<: *django-env
+    command: ["celery", "-A", "config", "beat", "--loglevel=info",
+              "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    depends_on:
+      - api
+      - redis
+
   frontend:
     build: ./frontend
     restart: unless-stopped
     depends_on:
       - api
       - ws
+    volumes:
+      # Les fichiers televerses sont servis par nginx, pas par Django :
+      # avec DEBUG=False, Django ne sert pas MEDIA_URL. Monte en lecture
+      # seule, le frontend n'ayant aucune raison d'y ecrire.
+      - media_data:/var/www/media:ro
     ports:
       - "80:80"
 
