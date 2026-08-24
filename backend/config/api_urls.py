@@ -20,6 +20,7 @@ from applications.tableau_bord.api import StatistiquesView
 from applications.documents.api import DocumentViewSet
 from applications.conges.api import DemandeCongeViewSet, JourFerieViewSet
 from applications.evenements.api import EvenementViewSet
+from applications.galerie.api import AlbumViewSet, PhotoViewSet
 from applications.prestations.api import (
     JalonPrestationViewSet, PrestationViewSet,
 )
@@ -40,6 +41,8 @@ router.register("documents", DocumentViewSet, basename="document")
 router.register("evenements", EvenementViewSet, basename="evenement")
 router.register("conges", DemandeCongeViewSet, basename="conge")
 router.register("jours-feries", JourFerieViewSet, basename="jour-ferie")
+router.register("albums", AlbumViewSet, basename="album")
+router.register("photos", PhotoViewSet, basename="photo")
 router.register("prestations", PrestationViewSet, basename="prestation")
 router.register("jalons", JalonPrestationViewSet, basename="jalon")
 router.register("notes-recues", NoteRecueViewSet, basename="note-recue")

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 
     'applications.conges',
     'applications.evenements',
+    'applications.galerie',
     'applications.notes',
     'applications.planification',
     'applications.prestations',

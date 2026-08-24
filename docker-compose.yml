@@ -15,6 +15,9 @@ x-django-env: &django-env
   DB_SSLMODE: disable
   REDIS_URL: redis://redis:6379/0
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+  # Ecoute sur toutes les interfaces du conteneur : lie a 127.0.0.1, le
+  # service ne serait joignable ni par nginx ni par le port publie.
+  API_HOST: 0.0.0.0
 
 services:
   db:
@@ -101,6 +104,11 @@ services:
     depends_on:
       - api
       - ws
+    volumes:
+      # Les fichiers televerses sont servis par nginx, pas par Django :
+      # avec DEBUG=False, Django ne sert pas MEDIA_URL. Monte en lecture
+      # seule, le frontend n'ayant aucune raison d'y ecrire.
+      - media_data:/var/www/media:ro
     ports:
       - "80:80"
 

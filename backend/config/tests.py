@@ -172,3 +172,32 @@ class RestreindreAuServiceTests(BaseSocle, TestCase):
     def test_compte_sans_service_ne_voit_rien(self):
         self.assertEqual(
             restreindre_au_service(User.objects.all(), self.sans_filiale).count(), 0)
+
+
+class ParametresServeurTests(TestCase):
+    """
+    Interface d'écoute de l'API.
+
+    Régression : `serve_api.py` était figé sur 127.0.0.1 alors qu'il sert
+    de commande au conteneur `api`. L'API n'était joignable que depuis
+    l'intérieur de son propre conteneur — nginx recevait « connection
+    refused » et le frontend ne pouvait appeler aucune API.
+    """
+
+    def test_ecoute_toutes_interfaces_par_defaut(self):
+        from serve_api import parametres_serveur
+
+        hote, port, threads = parametres_serveur({})
+
+        self.assertEqual(hote, "0.0.0.0")
+        self.assertEqual(port, 8000)
+        self.assertEqual(threads, 4)
+
+    def test_surcharge_par_l_environnement(self):
+        from serve_api import parametres_serveur
+
+        hote, port, threads = parametres_serveur({
+            "API_HOST": "127.0.0.1", "API_PORT": "9000", "API_THREADS": "8",
+        })
+
+        self.assertEqual((hote, port, threads), ("127.0.0.1", 9000, 8))
