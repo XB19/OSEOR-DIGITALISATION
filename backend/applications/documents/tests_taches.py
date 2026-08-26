@@ -221,3 +221,32 @@ class ReinitialisationHorairesTests(TestCase):
         tache = PeriodicTask.objects.get(name=TACHE_ANNUELLE["nom"])
         self.assertEqual(tache.crontab.day_of_month, "31")
         self.assertEqual(tache.crontab.month_of_year, "12")
+
+
+class TachesOrphelinesTests(TestCase):
+    """
+    Une tâche retirée du code reste planifiée en base : le seed ne supprime
+    jamais rien, faute de pouvoir distinguer un retrait volontaire d'une
+    tâche créée à la main depuis l'admin. Elle doit au moins être signalée,
+    sans quoi la planification dérive du code en silence.
+    """
+
+    def test_orpheline_signalee(self):
+        from django_celery_beat.models import IntervalSchedule
+
+        horaire = IntervalSchedule.objects.create(
+            every=1, period=IntervalSchedule.DAYS)
+        PeriodicTask.objects.create(
+            name="Tâche retirée du code", task="ancien.module.tache",
+            interval=horaire)
+
+        sortie = StringIO()
+        call_command("seed_taches_planifiees", stdout=sortie)
+
+        self.assertIn("Orpheline", sortie.getvalue())
+        self.assertIn("Tâche retirée du code", sortie.getvalue())
+
+    def test_taches_declarees_non_signalees(self):
+        sortie = StringIO()
+        call_command("seed_taches_planifiees", stdout=sortie)
+        self.assertNotIn("Orpheline", sortie.getvalue())

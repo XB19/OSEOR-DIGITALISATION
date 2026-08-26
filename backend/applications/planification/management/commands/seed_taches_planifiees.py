@@ -58,6 +58,33 @@ class Command(BaseCommand):
         for definition in taches:
             self._enregistrer(definition, options["reinitialiser_horaires"])
 
+        self._signaler_orphelines(taches)
+
+    def _signaler_orphelines(self, taches):
+        """
+        Signale les tâches encore planifiées en base qu'aucune application
+        ne déclare plus.
+
+        Elles subsistent parce que le seed ne supprime jamais rien — il ne
+        peut pas distinguer une tâche retirée du code d'une tâche créée à la
+        main depuis l'admin. Les signaler laisse l'arbitrage à l'exploitant
+        plutôt que d'effacer une planification qu'il aurait voulue.
+        """
+        declarees = {d["nom"] for d in taches}
+
+        orphelines = (
+            PeriodicTask.objects
+            .exclude(name__in=declarees)
+            .exclude(name__startswith="celery.")
+        )
+
+        for tache in orphelines:
+            self.stdout.write(self.style.WARNING(
+                f"Orpheline : « {tache.name} » ({tache.task}) est planifiée en "
+                f"base mais plus déclarée dans le code. À désactiver depuis "
+                f"l'admin si elle n'a plus lieu d'être."
+            ))
+
     def _enregistrer(self, definition, reinitialiser=False):
         horaire, _ = CrontabSchedule.objects.get_or_create(
             **{**CRONTAB_COMPLET, **definition["crontab"]},
