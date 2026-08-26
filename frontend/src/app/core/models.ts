@@ -175,7 +175,8 @@ export interface ParametresLDAP {
 }
 
 export type TypeDocumentAdministratif =
-  'FICHE_BESOIN' | 'DEMANDE_ACHAT' | 'FICHE_TRANSPORT' | 'BON_SORTIE_CAISSE' | 'BON_COMMANDE';
+  'FICHE_BESOIN' | 'DEMANDE_ACHAT' | 'FICHE_TRANSPORT' | 'BON_SORTIE_CAISSE'
+  | 'BON_COMMANDE' | 'NOTE_INTERNE' | 'FACTURE';
 
 export type StatutLivraison = 'EN_ATTENTE' | 'ENVOYE' | 'LIVRE_PARTIEL' | 'LIVRE' | 'ANNULE';
 
@@ -185,6 +186,22 @@ export const LIBELLES_STATUT_LIVRAISON: Record<StatutLivraison, string> = {
   LIVRE_PARTIEL: 'Livré partiellement',
   LIVRE: 'Livré',
   ANNULE: 'Annulé',
+};
+
+/**
+ * Règlement d'une facture — distinct du statut de visa.
+ *
+ * Une facture peut être entièrement visée et rester impayée : confondre
+ * les deux ferait disparaître les impayés du suivi.
+ */
+export type StatutPaiement = 'A_PAYER' | 'PARTIEL' | 'PAYEE' | 'LITIGE' | 'ANNULEE';
+
+export const LIBELLES_STATUT_PAIEMENT: Record<StatutPaiement, string> = {
+  A_PAYER: 'À payer',
+  PARTIEL: 'Payée partiellement',
+  PAYEE: 'Payée',
+  LITIGE: 'En litige',
+  ANNULEE: 'Annulée',
 };
 
 export interface ColonneDocument {
@@ -242,6 +259,9 @@ export interface DocumentAdministratif {
   motif_rejet: string;
   visa_courant: EtapeVisa | null;
   peut_viser: boolean;
+  /** Factures uniquement : règlement, indépendant du circuit de visas. */
+  statut_paiement?: StatutPaiement | '';
+  echeance_depassee?: boolean;
   date_creation: string;
   date_modification: string;
 }

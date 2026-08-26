@@ -6,6 +6,7 @@ import {
   Salle, Equipement, Filiale, Reservation, DisponibiliteResultat,
   Audience, Delegation, Utilisateur, NotificationItem, Paginated, ParametresLDAP,
   ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif, StatutLivraison,
+  StatutPaiement,
   Article, MouvementStock, Contrat, RapportAdministratif,
 } from './models';
 
@@ -230,6 +231,12 @@ export class ApiService {
   telechargerDocumentPdf(id: number): Observable<Blob> {
     return this.http.get(`${this.api}/documents/${id}/pdf/`, { responseType: 'blob' });
   }
+  /** Constate un règlement de facture — distinct du circuit de visas. */
+  majStatutPaiement(id: number, statut_paiement: StatutPaiement): Observable<DocumentAdministratif> {
+    return this.muterEtInvalider(this.http.post<DocumentAdministratif>(
+      `${this.api}/documents/${id}/statut_paiement/`, { statut_paiement }));
+  }
+
   majStatutLivraison(id: number, statut_livraison: StatutLivraison): Observable<DocumentAdministratif> {
     return this.http.post<DocumentAdministratif>(
       `${this.api}/documents/${id}/statut_livraison/`, { statut_livraison });

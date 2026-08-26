@@ -125,6 +125,11 @@ export const routes: Routes = [
           import('./pages/evenements/evenements.component').then((m) => m.EvenementsComponent),
       },
       {
+        path: 'notes-recues',
+        loadComponent: () =>
+          import('./pages/notes-recues/notes-recues.component').then((m) => m.NotesRecuesComponent),
+      },
+      {
         path: 'galerie',
         loadComponent: () =>
           import('./pages/galerie/galerie.component').then((m) => m.GalerieComponent),

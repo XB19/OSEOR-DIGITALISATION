@@ -14,6 +14,7 @@ class TypeDocument(models.TextChoices):
     BON_SORTIE_CAISSE = "BON_SORTIE_CAISSE", "Bon de sortie de caisse"
     BON_COMMANDE = "BON_COMMANDE", "Bon de commande"
     NOTE_INTERNE = "NOTE_INTERNE", "Note interne"
+    FACTURE = "FACTURE", "Facture"
 
 
 class ConfigurationDocument(models.Model):
@@ -100,6 +101,23 @@ class Document(models.Model):
         LIVRE_PARTIEL = "LIVRE_PARTIEL", "Livré partiellement"
         LIVRE = "LIVRE", "Livré"
         ANNULE = "ANNULE", "Annulé"
+
+    class StatutPaiement(models.TextChoices):
+        """
+        Suivi post-approbation d'une Facture — stocké dans
+        `champs_entete["statut_paiement"]`, comme le statut de livraison
+        d'un bon de commande : l'information ne concerne qu'un seul type de
+        document et n'a pas à peupler la table de tous les autres.
+
+        Distinct du `statut` du document : une facture peut être VALIDÉE
+        (visas apposés) tout en restant À PAYER. Confondre les deux ferait
+        disparaître des impayés d'un tableau de bord.
+        """
+        A_PAYER = "A_PAYER", "À payer"
+        PARTIEL = "PARTIEL", "Payée partiellement"
+        PAYEE = "PAYEE", "Payée"
+        LITIGE = "LITIGE", "En litige"
+        ANNULEE = "ANNULEE", "Annulée"
 
     filiale = models.ForeignKey(
         "filiales.Filiale",
@@ -210,6 +228,40 @@ class Document(models.Model):
 
     def __str__(self):
         return f"{self.numero} — {self.get_type_document_display()}"
+
+    @property
+    def statut_paiement(self):
+        """Statut de règlement d'une facture, « À payer » par défaut."""
+        if self.type_document != TypeDocument.FACTURE:
+            return ""
+        return (self.champs_entete or {}).get(
+            "statut_paiement", self.StatutPaiement.A_PAYER)
+
+    @property
+    def echeance_depassee(self):
+        """
+        True si la facture est validée, non réglée et son échéance passée.
+
+        Se calcule, ne se stocke pas : un drapeau « en retard » enregistré
+        en base devient faux dès le lendemain.
+        """
+        from datetime import date
+
+        if self.type_document != TypeDocument.FACTURE:
+            return False
+        if self.statut_paiement in (
+            self.StatutPaiement.PAYEE, self.StatutPaiement.ANNULEE,
+        ):
+            return False
+
+        brut = (self.champs_entete or {}).get("date_echeance")
+        if not brut:
+            return False
+        try:
+            return date.fromisoformat(str(brut)[:10]) < date.today()
+        except ValueError:
+            # Une saisie libre illisible ne doit pas faire planter une liste.
+            return False
 
     def configuration(self):
         return ConfigurationDocument.objects.filter(
