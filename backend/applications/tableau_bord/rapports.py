@@ -6,7 +6,6 @@ groupe. Purement en lecture : aucune donnée propre, tout est dérivé des
 autres modules (documents, contrats, stocks).
 """
 
-import csv
 from datetime import date
 from decimal import Decimal
 
@@ -22,6 +21,8 @@ from applications.filiales.models import Filiale
 from applications.documents.models import Document, TypeDocument
 from applications.contrats.models import Contrat
 from applications.stocks.models import Article, MouvementStock
+
+from .pdf import generer_pdf_rapport_administratif
 
 
 def _parse_date(valeur):
@@ -167,46 +168,14 @@ class RapportAdministratifView(APIView):
 
 
 class RapportAdministratifExportView(APIView):
-    """Même consolidation que RapportAdministratifView, restituée en CSV téléchargeable."""
+    """Même consolidation que RapportAdministratifView, restituée en PDF imprimable/archivable."""
 
     permission_classes = [IsAuthenticated, GereLesRapports]
 
     def get(self, request):
         rapport, date_debut, date_fin = _construire_rapport(request)
+        contenu = generer_pdf_rapport_administratif(rapport, date_debut, date_fin)
 
-        reponse = HttpResponse(content_type="text/csv")
-        reponse["Content-Disposition"] = f'attachment; filename="rapport_administratif_{date_debut}_{date_fin}.csv"'
-        reponse.write("﻿")  # BOM : accents lisibles à l'ouverture dans Excel
-
-        writer = csv.writer(reponse)
-        writer.writerow(["Rapport administratif", f"Du {date_debut} au {date_fin}", rapport["filiale"]])
-        writer.writerow([])
-
-        writer.writerow(["Documents", "Total", "En cours", "Validés", "Refusés", "Montant validé"])
-        for ligne in rapport["documents"]["par_type"]:
-            writer.writerow([
-                ligne["type_document_libelle"], ligne["total"], ligne["en_cours"],
-                ligne["valides"], ligne["refuses"], ligne["montant_valide"],
-            ])
-        writer.writerow([
-            "TOTAL", rapport["documents"]["total_documents"], "", "", "",
-            rapport["documents"]["montant_total_valide"],
-        ])
-        writer.writerow([])
-
-        c = rapport["contrats"]
-        writer.writerow(["Contrats", "Actifs", "Expirés", "Résiliés", "Montant engagé", "Échéances < 30j"])
-        writer.writerow(["", c["actifs"], c["expires"], c["resilies"], c["montant_engage"], c["echeances_proches_30j"]])
-        writer.writerow([])
-
-        s = rapport["stocks"]
-        writer.writerow(["Stocks", "Mouvements", "Quantité entrées", "Quantité sorties", "Articles en alerte"])
-        writer.writerow(["", s["mouvements_total"], s["quantite_entrees"], s["quantite_sorties"], s["articles_en_alerte"]])
-
-        if "repartition_par_filiale" in rapport:
-            writer.writerow([])
-            writer.writerow(["Répartition par filiale", "Montant validé"])
-            for ligne in rapport["repartition_par_filiale"]:
-                writer.writerow([ligne["filiale"], ligne["montant_valide"]])
-
+        reponse = HttpResponse(contenu, content_type="application/pdf")
+        reponse["Content-Disposition"] = f'attachment; filename="rapport_administratif_{date_debut}_{date_fin}.pdf"'
         return reponse

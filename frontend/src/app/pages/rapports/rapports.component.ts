@@ -25,7 +25,7 @@ function aujourdHui(): string {
       <p class="sous-titre">Consolidation comptable et administrative — documents, contrats, stocks</p>
     </div>
     <button class="btn cta" (click)="exporter()" [disabled]="exportEnCours() || chargement()">
-      @if (exportEnCours()) { <span class="spinner petit"></span> Export… } @else { <app-icon name="doc"/> Exporter en CSV }
+      @if (exportEnCours()) { <span class="spinner petit"></span> Export… } @else { <app-icon name="doc"/> Exporter en PDF }
     </button>
   </div>
 
@@ -209,7 +209,7 @@ export class RapportsComponent implements OnInit {
         const url = window.URL.createObjectURL(blob);
         const lien = document.createElement('a');
         lien.href = url;
-        lien.download = `rapport_administratif_${this.dateDebut}_${this.dateFin}.csv`;
+        lien.download = `rapport_administratif_${this.dateDebut}_${this.dateFin}.pdf`;
         lien.click();
         window.URL.revokeObjectURL(url);
       },
