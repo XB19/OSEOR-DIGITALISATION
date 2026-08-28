@@ -67,6 +67,9 @@ export const MODULES_MOYENS_GENERAUX: ModuleMetier[] = [
  */
 export const MODULES_VIE_INTERNE: ModuleMetier[] = [
   { lien: '/conges', libelle: 'Congés et permissions', icone: 'sun' },
+  // Recevoir une note concerne tout le monde ; la rédiger reste réservé
+  // aux secrétaires et à la direction (voir /notes-internes).
+  { lien: '/notes-recues', libelle: 'Notes de service', icone: 'doc' },
   { lien: '/evenements', libelle: 'Événements', icone: 'gift' },
   { lien: '/galerie', libelle: 'Mémoire / Galerie', icone: 'image' },
 ];
@@ -81,4 +84,6 @@ export const CHEMIN_PAR_TYPE_DOCUMENT: Record<string, string> = {
   FICHE_TRANSPORT: '/deplacements',
   BON_SORTIE_CAISSE: '/bon-sortie-caisse',
   BON_COMMANDE: '/bons-commande',
+  NOTE_INTERNE: '/notes-internes',
+  FACTURE: '/factures',
 };

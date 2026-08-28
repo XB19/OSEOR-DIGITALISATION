@@ -46,6 +46,12 @@ COLONNES_DEFAUT = {
     # Une note de service n'a pas de tableau de lignes : son contenu tient
     # dans l'objet et le corps, portes par champs_entete.
     TypeDocument.NOTE_INTERNE: [],
+    TypeDocument.FACTURE: [
+        {"cle": "designation", "libelle": "Désignation"},
+        {"cle": "qte", "libelle": "Qté"},
+        {"cle": "puht", "libelle": "PU HT"},
+        {"cle": "montant", "libelle": "Montant"},
+    ],
 }
 
 # Chaînes de visas par défaut, par type de document (utilisées quand
@@ -83,6 +89,13 @@ VISAS_DEFAUT = {
     TypeDocument.NOTE_INTERNE: [
         {"cle": "redacteur", "libelle": "Rédigée par"},
         {"cle": "directeur_general", "libelle": "Visa du Directeur Général", "role": "DIRECTEUR"},
+    ],
+    # Une facture est contrôlée avant d'être engagée : le comptable
+    # rapproche, le DG approuve la dépense.
+    TypeDocument.FACTURE: [
+        {"cle": "saisie_par", "libelle": "Saisie par"},
+        {"cle": "comptable", "libelle": "Vérification comptable", "role": "COMPTABLE"},
+        {"cle": "directeur_general", "libelle": "Approbation du Directeur Général", "role": "DIRECTEUR"},
     ],
 }
 

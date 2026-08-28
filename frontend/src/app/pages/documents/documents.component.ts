@@ -8,6 +8,7 @@ import { IconComponent } from '../../shared/icon.component';
 import {
   ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif,
   StatutLivraison, LIBELLES_STATUT_LIVRAISON,
+  StatutPaiement, LIBELLES_STATUT_PAIEMENT,
 } from '../../core/models';
 
 // Champs d'en-tête additionnels selon le type de document (structurels au
@@ -31,9 +32,24 @@ const CHAMPS_ENTETE: Record<TypeDocumentAdministratif, { cle: string; libelle: s
     { cle: 'reference', libelle: 'Référence' },
     { cle: 'delai_livraison', libelle: 'Délai de livraison souhaité' },
   ],
+  // Une note de service n'a pas de tableau de lignes : son contenu tient
+  // dans l'en-tête. `visibilite` détermine à qui elle est diffusée une fois
+  // signée (GROUPE, FILIALE ou SERVICE).
+  NOTE_INTERNE: [
+    { cle: 'objet', libelle: 'Objet' },
+    { cle: 'corps', libelle: 'Texte de la note' },
+    { cle: 'visibilite', libelle: 'Diffusion (GROUPE, FILIALE ou SERVICE)' },
+  ],
+  FACTURE: [
+    { cle: 'fournisseur', libelle: 'Fournisseur' },
+    { cle: 'numero_fournisseur', libelle: 'N° de facture fournisseur' },
+    { cle: 'date_echeance', libelle: 'Échéance (AAAA-MM-JJ)' },
+    { cle: 'bon_commande', libelle: 'Bon de commande associé (n°)' },
+  ],
 };
 
 const STATUTS_LIVRAISON: StatutLivraison[] = ['EN_ATTENTE', 'ENVOYE', 'LIVRE_PARTIEL', 'LIVRE', 'ANNULE'];
+const STATUTS_PAIEMENT: StatutPaiement[] = ['A_PAYER', 'PARTIEL', 'PAYEE', 'LITIGE', 'ANNULEE'];
 
 @Component({
   selector: 'app-documents',
@@ -203,6 +219,32 @@ const STATUTS_LIVRAISON: StatutLivraison[] = ['EN_ATTENTE', 'ENVOYE', 'LIVRE_PAR
         </div>
       }
 
+      @if (type === 'FACTURE' && d.statut === 'VALIDE') {
+        <div class="viser-bloc">
+          <h4>Règlement</h4>
+          <p class="sous-titre">
+            Statut actuel : <strong>{{ libelleStatutPaiement(d) }}</strong>
+            @if (d.echeance_depassee) { — <span class="mono">échéance dépassée</span> }
+          </p>
+          @if (peutSuivrePaiement()) {
+            <div class="boutons">
+              @for (s of statutsPaiement; track s) {
+                <button
+                  class="btn secondaire petit"
+                  [disabled]="statutPaiementEnCours() || d.statut_paiement === s"
+                  (click)="majStatutPaiement(d, s)">
+                  {{ LIBELLES_STATUT_PAIEMENT[s] }}
+                </button>
+              }
+            </div>
+          } @else {
+            <p class="sous-titre">
+              Seuls le comptable de la filiale et la direction constatent un règlement.
+            </p>
+          }
+        </div>
+      }
+
       @if (type === 'BON_COMMANDE' && d.statut === 'VALIDE' && peutSuivreLivraison(d)) {
         <div class="viser-bloc">
           <h4>Suivi de livraison</h4>
@@ -309,6 +351,9 @@ export class DocumentsComponent implements OnInit {
   statutLivraisonEnCours = signal(false);
   statutsLivraison = STATUTS_LIVRAISON;
   LIBELLES_STATUT_LIVRAISON = LIBELLES_STATUT_LIVRAISON;
+  statutPaiementEnCours = signal(false);
+  statutsPaiement = STATUTS_PAIEMENT;
+  LIBELLES_STATUT_PAIEMENT = LIBELLES_STATUT_PAIEMENT;
 
   form: any = { champs_entete: {}, lignes: [], montant_total: '0.00', document_source: null };
 
@@ -476,6 +521,32 @@ export class DocumentsComponent implements OnInit {
     if (trouve) return trouve.libelle;
     const mot = cle.replace(/_/g, ' ');
     return mot.charAt(0).toUpperCase() + mot.slice(1);
+  }
+
+  /** Le règlement se constate par la trésorerie, pas par le demandeur. */
+  peutSuivrePaiement(): boolean {
+    return this.auth.aRole('COMPTABLE', 'DIRECTEUR', 'ADMINISTRATEUR');
+  }
+
+  libelleStatutPaiement(d: DocumentAdministratif): string {
+    const s = (d.statut_paiement || 'A_PAYER') as StatutPaiement;
+    return LIBELLES_STATUT_PAIEMENT[s] ?? s;
+  }
+
+  majStatutPaiement(d: DocumentAdministratif, statut: StatutPaiement): void {
+    this.statutPaiementEnCours.set(true);
+    this.api.majStatutPaiement(d.id, statut).subscribe({
+      next: (maj) => {
+        this.statutPaiementEnCours.set(false);
+        this.selection.set(maj);
+        this.charger();
+      },
+      error: (e) => {
+        this.statutPaiementEnCours.set(false);
+        this.erreur.set(
+          e?.error?.detail || 'Erreur lors de la mise à jour du règlement.');
+      },
+    });
   }
 
   peutSuivreLivraison(d: DocumentAdministratif): boolean {

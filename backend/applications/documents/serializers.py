@@ -14,6 +14,7 @@ _TYPE_COURT = {
     TypeDocument.BON_SORTIE_CAISSE: "BSC",
     TypeDocument.BON_COMMANDE: "BC",
     TypeDocument.NOTE_INTERNE: "NI",
+    TypeDocument.FACTURE: "FAC",
 }
 
 
@@ -92,6 +93,8 @@ class DocumentSerializer(serializers.ModelSerializer):
     documents_derives_numeros = serializers.SerializerMethodField()
     visa_courant = serializers.SerializerMethodField()
     peut_viser = serializers.SerializerMethodField()
+    statut_paiement = serializers.CharField(read_only=True)
+    echeance_depassee = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Document
@@ -102,6 +105,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             "document_source", "document_source_numero", "documents_derives_numeros",
             "statut", "statut_libelle", "etape_visa_courante",
             "historique_visas", "motif_rejet", "visa_courant", "peut_viser",
+            "statut_paiement", "echeance_depassee",
             "date_creation", "date_modification",
         )
         read_only_fields = fields

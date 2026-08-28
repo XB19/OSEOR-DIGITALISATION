@@ -150,6 +150,70 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response(DocumentSerializer(document, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["post"])
+    def statut_paiement(self, request, pk=None):
+        """
+        Suivi de règlement d'une facture, après approbation.
+
+        Volontairement distinct du `statut` du document : une facture peut
+        être visée par tout le circuit et rester impayée. Les confondre
+        ferait disparaître les impayés du suivi.
+
+        Réservé au comptable de la filiale et à la direction — c'est la
+        trésorerie qui constate un règlement, pas le demandeur.
+        """
+        document = self.get_object()
+
+        if document.type_document != TypeDocument.FACTURE:
+            return Response({"detail": "Action réservée aux factures."}, status=400)
+        if document.statut != Document.Statut.VALIDE:
+            return Response(
+                {"detail": "La facture doit être validée avant d'en suivre le "
+                           "règlement."}, status=400,
+            )
+
+        u = request.user
+        autorise = est_direction(u) or (
+            u.role == "COMPTABLE" and u.filiale_id == document.filiale_id
+        )
+        if not autorise:
+            return Response(
+                {"detail": "Seuls le comptable de la filiale et la direction "
+                           "peuvent constater un règlement."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        nouveau = request.data.get("statut_paiement")
+        valides = [c for c, _ in Document.StatutPaiement.choices]
+        if nouveau not in valides:
+            return Response(
+                {"detail": f"Statut de paiement invalide. Attendu : "
+                           f"{', '.join(valides)}."}, status=400,
+            )
+
+        entete = dict(document.champs_entete or {})
+        ancien = entete.get("statut_paiement", Document.StatutPaiement.A_PAYER)
+        entete["statut_paiement"] = nouveau
+        document.champs_entete = entete
+        document.save(update_fields=["champs_entete", "date_modification"])
+
+        enregistrer_action(
+            u, "FACTURE_PAIEMENT",
+            f"{document.numero} — {ancien} → {nouveau}", objet=document,
+        )
+
+        if nouveau == Document.StatutPaiement.PAYEE:
+            envoyer_notification(
+                document.demandeur,
+                "Facture réglée",
+                f"{document.numero} a été réglée.",
+                "SUCCESS",
+                objet=document,
+            )
+
+        return Response(
+            DocumentSerializer(document, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"])
     def statut_livraison(self, request, pk=None):
         """
         Suivi post-approbation d'un Bon de commande (Émission et suivi) :
