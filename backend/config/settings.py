@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
     'django_celery_beat',
 
+    'applications.aide',
     'applications.conges',
     'applications.evenements',
     'applications.galerie',

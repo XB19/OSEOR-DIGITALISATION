@@ -371,3 +371,26 @@ export interface Paginated<T> {
   previous: string | null;
   results: T[];
 }
+
+// ---------- Aide (chatbot FAQ) ----------
+export interface EntreeAide {
+  id: number;
+  module: string;
+  module_libelle: string;
+  question: string;
+  mots_cles: string;
+  reponse: string;
+  ordre: number;
+  actif: boolean;
+}
+
+export interface ModuleAide {
+  module: string;
+  libelle: string;
+  count: number;
+}
+
+export interface ReponseAideChat {
+  trouve: boolean;
+  resultats: EntreeAide[];
+}

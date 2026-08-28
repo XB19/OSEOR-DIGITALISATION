@@ -7,15 +7,17 @@ import { NotificationsService } from '../core/notifications.service';
 import { IconComponent } from '../shared/icon.component';
 import { ToastsComponent } from '../shared/toasts.component';
 import { DialogueComponent } from '../shared/dialogue.component';
+import { AideChatbotComponent } from '../shared/aide-chatbot.component';
 import { MODULES_MOYENS_GENERAUX, MODULES_VIE_INTERNE, ModuleMetier, CHEMIN_PAR_TYPE_DOCUMENT } from '../core/modules-metier';
 import { NotificationItem } from '../core/models';
 
 @Component({
   selector: 'app-shell',
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToastsComponent, DialogueComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, IconComponent, ToastsComponent, DialogueComponent, AideChatbotComponent],
   template: `
   <app-toasts />
   <app-dialogue />
+  <app-aide-chatbot />
   <div class="layout">
     <aside class="sidebar">
       <div class="logo">

@@ -7,6 +7,7 @@ import {
   Audience, Delegation, Utilisateur, NotificationItem, Paginated, ParametresLDAP,
   ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif, StatutLivraison,
   Article, MouvementStock, Contrat, RapportAdministratif,
+  EntreeAide, ModuleAide, ReponseAideChat,
 } from './models';
 
 /** Service d'accès à l'API REST OSEOR. */
@@ -298,5 +299,17 @@ export class ApiService {
   exporterRapportAdministratif(filtres: { date_debut?: string; date_fin?: string; filiale?: number } = {}): Observable<Blob> {
     return this.http.get(
       `${this.api}/rapports/administratif/export/`, { params: this.params(filtres), responseType: 'blob' });
+  }
+
+  // ---------- Aide (chatbot FAQ) ----------
+  entreesAide(filtres: Record<string, any> = {}): Observable<Paginated<EntreeAide>> {
+    return this.http.get<Paginated<EntreeAide>>(`${this.api}/aide/`, { params: this.params(filtres) });
+  }
+  modulesAide(): Observable<ModuleAide[]> {
+    return this.cacheRef('aide:modules', () =>
+      this.http.get<ModuleAide[]>(`${this.api}/aide/modules/`));
+  }
+  poserQuestionAide(question: string): Observable<ReponseAideChat> {
+    return this.http.post<ReponseAideChat>(`${this.api}/aide/poser_question/`, { question });
   }
 }

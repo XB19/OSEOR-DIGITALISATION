@@ -28,6 +28,7 @@ from applications.prestations.api import (
     JalonPrestationViewSet, PrestationViewSet,
 )
 from applications.notes.api import NoteRecueViewSet
+from applications.aide.api import EntreeAideViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -52,6 +53,7 @@ router.register("photos", PhotoViewSet, basename="photo")
 router.register("prestations", PrestationViewSet, basename="prestation")
 router.register("jalons", JalonPrestationViewSet, basename="jalon")
 router.register("notes-recues", NoteRecueViewSet, basename="note-recue")
+router.register("aide", EntreeAideViewSet, basename="entree-aide")
 
 urlpatterns = [
     # Authentification JWT (dev)
