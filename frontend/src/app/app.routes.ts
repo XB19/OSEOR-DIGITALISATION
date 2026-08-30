@@ -23,6 +23,11 @@ const COMPOSANTS_DEDIES: Partial<Record<string, () => Promise<any>>> = {
 // entière — chemin -> composant.
 const COMPOSANTS_PAR_CHEMIN: Partial<Record<string, () => Promise<any>>> = {
   '/stocks': () => import('./pages/stocks/stocks.component').then((c) => c.StocksComponent),
+  // Le bon de sortie n'est plus un document de plus dans le moteur
+  // générique : il naît dans la caisse, qui en engendre la pièce à
+  // imprimer. Un seul écran, donc, pour la demande et pour l'argent.
+  '/bon-sortie-caisse': () =>
+    import('./pages/caisse/caisse.component').then((c) => c.CaisseComponent),
   '/contrats': () => import('./pages/contrats/contrats.component').then((c) => c.ContratsComponent),
   '/rapports-administratifs': () =>
     import('./pages/rapports/rapports.component').then((c) => c.RapportsComponent),
@@ -139,6 +144,15 @@ export const routes: Routes = [
         canActivate: [roleGuard('CHEF_SERVICE', 'DIRECTEUR', 'ADMINISTRATEUR')],
         loadComponent: () =>
           import('./pages/prestations/prestations.component').then((m) => m.PrestationsComponent),
+      },
+      {
+        // Sans garde de rôle : un salarié convoqué suit le lien de sa
+        // notification et ne voit que son propre dossier (le service ne
+        // lui en renvoie pas d'autre). L'entrée de menu, elle, reste
+        // réservée à ceux qui instruisent.
+        path: 'discipline',
+        loadComponent: () =>
+          import('./pages/discipline/discipline.component').then((m) => m.DisciplineComponent),
       },
       {
         path: 'profil',

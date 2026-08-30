@@ -38,7 +38,7 @@ import { NotificationItem } from '../core/models';
         <a routerLink="/audiences" routerLinkActive="actif"><app-icon name="users"/> Audiences</a>
 
         <div class="nav-titre">Vie interne</div>
-        @for (m of MODULES_VIE_INTERNE; track m.lien) {
+        @for (m of modulesVieInterne(); track m.lien) {
           <a [routerLink]="m.lien" routerLinkActive="actif"><app-icon [name]="m.icone"/> {{ m.libelle }}</a>
         }
 
@@ -215,8 +215,14 @@ export class ShellComponent implements OnInit {
     return MODULES_MOYENS_GENERAUX.filter((m) => !m.roles || this.auth.aRole(...m.roles));
   }
 
-  /** Ouverts à tous : chacun pose ses congés et consulte la galerie. */
-  protected readonly MODULES_VIE_INTERNE = MODULES_VIE_INTERNE;
+  /**
+   * Presque tous ouverts à chacun — congés, événements, galerie. La
+   * discipline fait exception : elle n'apparaît qu'à ceux qui instruisent,
+   * un salarié n'atteignant son propre dossier que par sa notification.
+   */
+  modulesVieInterne(): ModuleMetier[] {
+    return MODULES_VIE_INTERNE.filter((m) => !m.roles || this.auth.aRole(...m.roles));
+  }
 
   /** Marque la notification lue puis navigue vers l'élément concerné, s'il y en a un. */
   ouvrirNotif(n: NotificationItem): void {
@@ -246,6 +252,18 @@ export class ShellComponent implements OnInit {
         break;
       case 'Contrat':
         this.router.navigate(['/contrats'], { queryParams: { id: n.objet_id } });
+        break;
+      case 'DemandeConge':
+        this.router.navigate(['/conges'], { queryParams: { id: n.objet_id } });
+        break;
+      case 'Caisse':
+      case 'BonSortie':
+        this.router.navigate(['/bon-sortie-caisse'], { queryParams: { id: n.objet_id } });
+        break;
+      case 'ProcedureDisciplinaire':
+        // Seule voie d'accès du salarié à son propre dossier : l'entrée de
+        // menu est réservée à ceux qui instruisent.
+        this.router.navigate(['/discipline'], { queryParams: { id: n.objet_id } });
         break;
     }
   }

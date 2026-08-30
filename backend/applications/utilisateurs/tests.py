@@ -106,6 +106,22 @@ class DatesNaissanceTests(APITestCase):
         self.employe.refresh_from_db()
         self.assertEqual(self.employe.date_naissance, date(1990, 3, 15))
 
+    def test_chacun_efface_la_sienne(self):
+        """
+        Le champ vidé depuis le profil doit effacer la date, pas échouer :
+        l'envoi est en multipart, où « pas de date » s'écrit chaîne vide.
+        """
+        self.employe.date_naissance = date(1990, 3, 15)
+        self.employe.save()
+        self.client.force_authenticate(self.employe)
+
+        reponse = self.client.patch(
+            "/api/auth/me/", {"date_naissance": ""}, format="multipart")
+
+        self.assertEqual(reponse.status_code, 200)
+        self.employe.refresh_from_db()
+        self.assertIsNone(self.employe.date_naissance)
+
     def test_saisie_groupee_par_l_administrateur(self):
         self.client.force_authenticate(self.admin)
 

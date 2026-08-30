@@ -70,6 +70,13 @@ import {
       jamais perdus. Acquisition de 2,5 jours par mois travaillé
       ({{ nombre(s.acquis) }} j acquis en {{ s.annee }}).
     </p>
+
+    <p class="note bleu">
+      <app-icon name="info" [size]="14"/>
+      Une demande de congé passe par votre responsable, puis par la
+      direction. Elle reste « en attente » entre les deux — c'est normal.
+      Les permissions exceptionnelles, elles, ne demandent qu'une signature.
+    </p>
   }
 
   <div class="onglets">
@@ -81,10 +88,48 @@ import {
         À valider <span class="pastille">{{ aValider().length }}</span>
       </button>
     }
+    @if (aGerer().length) {
+      <button [class.actif]="onglet() === 'gerer'" (click)="onglet.set('gerer')">
+        Congés en cours <span class="pastille">{{ aGerer().length }}</span>
+      </button>
+    }
     <button [class.actif]="onglet() === 'registre'" (click)="onglet.set('registre')">
       Mon registre
     </button>
   </div>
+
+  @if (onglet() === 'gerer') {
+    <div class="carte anim-entree">
+      <p class="sous">
+        Congés validés de votre équipe. Un salarié rappelé en service
+        récupère ses jours travaillés : son retour est simplement repoussé
+        d'autant (article 44 de la Convention Collective).
+      </p>
+      <table class="tableau">
+        <thead>
+          <tr><th>Salarié</th><th>Période</th><th>Statut</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (d of aGerer(); track d.id) {
+            <tr>
+              <td>{{ d.utilisateur_nom }}</td>
+              <td>{{ d.date_debut | date: 'dd/MM/yyyy' }} → {{ d.date_fin | date: 'dd/MM/yyyy' }}</td>
+              <td><span class="etat" [class]="'etat-' + d.statut.toLowerCase()">{{ d.statut_libelle }}</span></td>
+              <td class="actions-ligne">
+                @if (d.statut === 'VALIDEE') {
+                  <button class="btn petit fantome" (click)="ouvrirReport(d)">Reporter</button>
+                  <button class="btn petit rouge" (click)="ouvrirRappel(d)">Rappeler</button>
+                }
+                @if (d.statut === 'INTERROMPUE') {
+                  <span class="detail">Rappelé le {{ d.date_rappel | date: 'dd/MM/yyyy' }} — en attente de sa décision</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 
   @if (onglet() === 'mes') {
     <div class="carte anim-entree">
@@ -105,7 +150,15 @@ import {
                     <div class="detail">{{ d.motif_permission_libelle }}</div>
                   }
                 </td>
-                <td>{{ d.date_debut | date: 'dd/MM/yyyy' }} → {{ d.date_fin | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  {{ d.date_debut | date: 'dd/MM/yyyy' }} → {{ d.date_fin | date: 'dd/MM/yyyy' }}
+                  @if (d.date_debut_initiale && d.date_debut_initiale !== d.date_debut) {
+                    <div class="detail">reporté (prévu le {{ d.date_debut_initiale | date: 'dd/MM/yyyy' }})</div>
+                  }
+                  @if (d.date_rappel) {
+                    <div class="detail">rappelé le {{ d.date_rappel | date: 'dd/MM/yyyy' }}</div>
+                  }
+                </td>
                 <td class="num">{{ d.jours_ouvres }}</td>
                 <td><span class="etat" [class]="'etat-' + d.statut.toLowerCase()">{{ d.statut_libelle }}</span></td>
                 <td>
@@ -121,9 +174,13 @@ import {
                     }
                   } @else { <span class="rien">—</span> }
                 </td>
-                <td>
+                <td class="actions-ligne">
                   @if (d.statut === 'EN_ATTENTE' || d.statut === 'VALIDEE') {
                     <button class="lien" (click)="annuler(d)">Annuler</button>
+                  }
+                  @if (d.statut === 'INTERROMPUE') {
+                    <button class="lien" (click)="reprendre(d)">Reprendre</button>
+                    <button class="lien" (click)="ecourter(d)">Renoncer au reste</button>
                   }
                 </td>
               </tr>
@@ -157,6 +214,7 @@ import {
               <td class="actions-ligne">
                 <button class="btn petit vert" (click)="decider(d, true)">Valider</button>
                 <button class="btn petit rouge" (click)="decider(d, false)">Refuser</button>
+                <button class="btn petit fantome" (click)="ouvrirReport(d)">Reporter</button>
               </td>
             </tr>
           }
@@ -190,6 +248,48 @@ import {
       } @else {
         <div class="vide">Aucun mouvement enregistré.</div>
       }
+    </div>
+  }
+
+  @if (reportOuvert(); as d) {
+    <div class="voile" (click)="reportOuvert.set(null)">
+      <div class="modale anim-entree" (click)="$event.stopPropagation()">
+        <h3>Reporter le congé</h3>
+        <p class="encart">
+          L'article 44 de la Convention Collective limite le report à trois
+          mois à compter de la date initialement fixée. La durée du congé
+          est préservée : la fenêtre est décalée, pas raccourcie.
+        </p>
+        <label>Nouvelle date de départ</label>
+        <input type="date" [(ngModel)]="nouvelleDate"/>
+        <label>Motif (communiqué au salarié)</label>
+        <textarea rows="2" [(ngModel)]="motifAction"></textarea>
+        <div class="pied">
+          <button class="btn fantome" (click)="reportOuvert.set(null)">Annuler</button>
+          <button class="btn cta" (click)="confirmerReport(d)">Reporter</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (rappelOuvert(); as d) {
+    <div class="voile" (click)="rappelOuvert.set(null)">
+      <div class="modale anim-entree" (click)="$event.stopPropagation()">
+        <h3>Rappeler en service</h3>
+        <p class="encart">
+          Les jours travaillés pendant le rappel seront rendus au salarié :
+          son congé sera prolongé d'autant. Il pourra aussi renoncer au
+          reste, auquel cas les jours non pris lui seront recrédités.
+        </p>
+        <label>Jour du rappel</label>
+        <input type="date" [(ngModel)]="jourAction"/>
+        <label>Motif</label>
+        <textarea rows="2" [(ngModel)]="motifAction"></textarea>
+        <div class="pied">
+          <button class="btn fantome" (click)="rappelOuvert.set(null)">Annuler</button>
+          <button class="btn cta" (click)="confirmerRappel(d)">Rappeler</button>
+        </div>
+      </div>
     </div>
   }
 
@@ -297,6 +397,10 @@ import {
     .etat-validee { background: #dcfce7; color: #166534; }
     .etat-refusee { background: #fee2e2; color: #991b1b; }
     .etat-annulee { background: #f1f5f9; color: #475569; }
+    .etat-interrompue { background: #ffedd5; color: #9a3412; }
+    .etat-terminee { background: #e0e7ff; color: #3730a3; }
+    .note.bleu { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+    .btn.fantome { background: none; border: 1px solid var(--bord); color: var(--txt); }
 
     .televerser { cursor: pointer; color: var(--bleu); font-size: .8rem; text-decoration: underline; }
     .televerser.retard { color: #b42318; font-weight: 600; }
@@ -333,7 +437,13 @@ export class CongesComponent implements OnInit {
   registre = signal<MouvementConge[]>([]);
   bareme = signal<MotifPermission[]>([]);
 
-  onglet = signal<'mes' | 'valider' | 'registre'>('mes');
+  onglet = signal<'mes' | 'valider' | 'gerer' | 'registre'>('mes');
+  aGerer = signal<DemandeConge[]>([]);
+  reportOuvert = signal<DemandeConge | null>(null);
+  rappelOuvert = signal<DemandeConge | null>(null);
+  nouvelleDate = '';
+  jourAction = '';
+  motifAction = '';
   formulaireOuvert = signal(false);
   envoi = signal(false);
 
@@ -371,6 +481,79 @@ export class CongesComponent implements OnInit {
     this.conges.mesDemandes().subscribe((r) => this.demandes.set(r.results ?? (r as any)));
     this.conges.aValider().subscribe((d) => this.aValider.set(d));
     this.conges.monRegistre().subscribe((m) => this.registre.set(m));
+
+    // Congés validés ou interrompus des personnes dont je suis
+    // responsable : c'est là que se pilotent report et rappel.
+    this.conges.mesDemandes().subscribe((r) => {
+      const toutes = (r.results ?? (r as any) ?? []) as DemandeConge[];
+      const moi = this.auth.utilisateur()?.id;
+      this.aGerer.set(toutes.filter(
+        (d) => d.utilisateur !== moi
+          && (d.statut === 'VALIDEE' || d.statut === 'INTERROMPUE')));
+    });
+  }
+
+  ouvrirReport(d: DemandeConge): void {
+    this.nouvelleDate = '';
+    this.motifAction = '';
+    this.reportOuvert.set(d);
+  }
+
+  ouvrirRappel(d: DemandeConge): void {
+    this.jourAction = new Date().toISOString().slice(0, 10);
+    this.motifAction = '';
+    this.rappelOuvert.set(d);
+  }
+
+  confirmerReport(d: DemandeConge): void {
+    if (!this.nouvelleDate || !this.motifAction.trim()) {
+      this.toast.erreur('Indiquez la nouvelle date et le motif.');
+      return;
+    }
+    this.conges.reporter(d.id, this.nouvelleDate, this.motifAction).subscribe({
+      next: () => {
+        this.reportOuvert.set(null);
+        this.toast.succes('Congé reporté.');
+        this.recharger();
+      },
+      error: (e) => this.toast.erreur(e?.error?.detail || 'Report impossible.'),
+    });
+  }
+
+  confirmerRappel(d: DemandeConge): void {
+    if (!this.motifAction.trim()) {
+      this.toast.erreur('Un rappel doit être motivé.');
+      return;
+    }
+    this.conges.rappeler(d.id, this.motifAction, this.jourAction).subscribe({
+      next: () => {
+        this.rappelOuvert.set(null);
+        this.toast.succes('Salarié rappelé ; ses jours travaillés lui seront rendus.');
+        this.recharger();
+      },
+      error: (e) => this.toast.erreur(e?.error?.detail || 'Rappel impossible.'),
+    });
+  }
+
+  reprendre(d: DemandeConge): void {
+    this.conges.reprendre(d.id).subscribe({
+      next: (maj) => {
+        this.toast.succes(
+          `Congé prolongé : retour le ${new Date(maj.date_fin).toLocaleDateString('fr-FR')}.`);
+        this.recharger();
+      },
+      error: (e) => this.toast.erreur(e?.error?.detail || 'Reprise impossible.'),
+    });
+  }
+
+  ecourter(d: DemandeConge): void {
+    this.conges.ecourter(d.id).subscribe({
+      next: () => {
+        this.toast.succes('Jours non pris recrédités.');
+        this.recharger();
+      },
+      error: (e) => this.toast.erreur(e?.error?.detail || 'Action impossible.'),
+    });
   }
 
   nombre(valeur: string | number): string {

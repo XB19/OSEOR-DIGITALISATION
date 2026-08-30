@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { ParametresLDAP } from '../../core/models';
 import { IconComponent } from '../../shared/icon.component';
+import { DatesNaissanceService, LigneDateNaissance } from '../../core/gestion.service';
 
 @Component({
   selector: 'app-administration',
@@ -86,8 +87,73 @@ import { IconComponent } from '../../shared/icon.component';
       </div>
     }
   </div>
+  <div class="carte anim-entree espace">
+    <div class="carte-entete">
+      <div class="carte-titre">
+        <app-icon name="cake" [size]="18"/>
+        <h3>Dates de naissance</h3>
+        <span class="badge" [class.validee]="renseignees() > 0">
+          {{ renseignees() }} / {{ lignes().length }}
+        </span>
+      </div>
+      <p class="carte-sous-titre">
+        Les anniversaires du calendrier se déduisent de ces dates : sans
+        elles, rien ne s'affiche et aucun rappel n'est envoyé. Chacun peut
+        renseigner la sienne depuis son profil, mais peu le font — d'où
+        cette saisie d'un bloc. Le champ reste facultatif : laissez vide
+        pour qui ne souhaite pas la partager, videz-le pour effacer.
+      </p>
+    </div>
+
+    @if (chargementDates()) {
+      <p class="txt-attente">Chargement…</p>
+    } @else {
+      <input class="filtre" [(ngModel)]="recherche" placeholder="Filtrer par nom…"/>
+
+      <div class="table-naissances">
+        @for (l of lignesFiltrees(); track l.id) {
+          <div class="ligne-nais">
+            <div class="qui">
+              <span class="nom">{{ l.nom_complet }}</span>
+              @if (l.filiale) { <span class="fil">{{ l.filiale }}</span> }
+            </div>
+            <input type="date" [max]="aujourdhui"
+                   [ngModel]="saisies[l.id] ?? ''"
+                   (ngModelChange)="modifier(l.id, $event)"/>
+          </div>
+        } @empty {
+          <p class="txt-attente">Aucun utilisateur ne correspond.</p>
+        }
+      </div>
+
+      <div class="boutons">
+        <button class="btn vert" [disabled]="!modifiees() || envoiDates()"
+                (click)="enregistrerDates()">
+          @if (envoiDates()) { <span class="spinner petit"></span> Envoi… }
+          @else { Enregistrer {{ modifiees() }} modification(s) }
+        </button>
+        @if (modifiees()) {
+          <button class="btn" (click)="annulerDates()">Annuler les modifications</button>
+        }
+      </div>
+    }
+  </div>
   `,
   styles: [`
+    .espace { margin-top: 1.2rem; }
+    .filtre { width: 100%; border: 1px solid var(--bord); border-radius: 8px;
+      padding: .55rem .7rem; font-size: .85rem; margin-bottom: .8rem; }
+    .table-naissances { max-height: 420px; overflow-y: auto; border: 1px solid var(--bord);
+      border-radius: 8px; }
+    .ligne-nais { display: flex; justify-content: space-between; align-items: center;
+      gap: 1rem; padding: .5rem .7rem; border-bottom: 1px solid var(--bord); }
+    .ligne-nais:last-child { border-bottom: none; }
+    .ligne-nais input { border: 1px solid var(--bord); border-radius: 8px;
+      padding: .4rem .5rem; font-size: .82rem; }
+    .qui { display: flex; flex-direction: column; }
+    .nom { font-size: .87rem; }
+    .fil { font-size: .74rem; color: var(--txt-2); }
+    .badge.validee { background: #f0fdf4; color: #15803d; }
     .entete { display: flex; justify-content: space-between; align-items: flex-start; }
     .sous-titre { color: var(--txt-2); font-size: .82rem; margin: .2rem 0 0; }
 
@@ -123,9 +189,94 @@ export class AdministrationComponent implements OnInit {
 
   form: any = { server_uri: '', domaine: '', base_dn: '', bind_dn: '', bind_password: '' };
 
-  constructor(private api: ApiService) {}
+  // ------------------------------------------------ dates de naissance
+  lignes = signal<LigneDateNaissance[]>([]);
+  chargementDates = signal(true);
+  envoiDates = signal(false);
+  recherche = '';
+  /** Saisie en cours, indexée par identifiant. */
+  saisies: Record<number, string> = {};
+  private initiales: Record<number, string> = {};
+
+  readonly aujourdhui = new Date().toISOString().slice(0, 10);
+
+  lignesFiltrees(): LigneDateNaissance[] {
+    const q = this.recherche.trim().toLowerCase();
+    if (!q) return this.lignes();
+    return this.lignes().filter((l) => l.nom_complet.toLowerCase().includes(q));
+  }
+
+  renseignees(): number {
+    return Object.values(this.saisies).filter((v) => !!v).length;
+  }
+
+  /** N'envoyer que ce qui a bougé : le serveur ne réécrit pas le reste. */
+  private changements(): Record<string, string | null> {
+    const sortie: Record<string, string | null> = {};
+    for (const [id, valeur] of Object.entries(this.saisies)) {
+      if ((this.initiales[+id] ?? '') !== valeur) {
+        sortie[id] = valeur || null;
+      }
+    }
+    return sortie;
+  }
+
+  modifiees(): number {
+    return Object.keys(this.changements()).length;
+  }
+
+  modifier(id: number, valeur: string): void {
+    this.saisies = { ...this.saisies, [id]: valeur ?? '' };
+  }
+
+  private chargerDates(): void {
+    this.chargementDates.set(true);
+    this.dates.liste().subscribe({
+      next: (lignes) => {
+        this.lignes.set(lignes);
+        this.saisies = {};
+        this.initiales = {};
+        for (const l of lignes) {
+          this.saisies[l.id] = l.date_naissance ?? '';
+          this.initiales[l.id] = l.date_naissance ?? '';
+        }
+        this.chargementDates.set(false);
+      },
+      error: () => this.chargementDates.set(false),
+    });
+  }
+
+  annulerDates(): void {
+    this.saisies = { ...this.initiales };
+  }
+
+  enregistrerDates(): void {
+    const changements = this.changements();
+    if (!Object.keys(changements).length) return;
+
+    this.envoiDates.set(true);
+    this.message.set('');
+
+    this.dates.enregistrer(changements).subscribe({
+      next: (r) => {
+        this.envoiDates.set(false);
+        this.initiales = { ...this.saisies };
+        this.messageOk.set(true);
+        this.message.set(`${r.mis_a_jour} date(s) enregistrée(s).`);
+      },
+      error: (e) => {
+        this.envoiDates.set(false);
+        this.messageOk.set(false);
+        this.message.set(e?.error?.detail || "Échec de l'enregistrement.");
+      },
+    });
+  }
+
+  constructor(private api: ApiService,
+    private dates: DatesNaissanceService) {}
 
   ngOnInit(): void {
+    this.chargerDates();
     this.charger();
   }
 

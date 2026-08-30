@@ -82,6 +82,12 @@ export interface DemandeConge {
   date_decision: string | null;
   motif_decision: string;
   date_creation: string;
+  /** Parcours après validation (report, rappel, reprise). */
+  date_debut_initiale: string | null;
+  motif_report: string;
+  date_rappel: string | null;
+  motif_rappel: string;
+  date_reprise: string | null;
 }
 
 export interface MouvementConge {
@@ -140,6 +146,30 @@ export class CongesService {
 
   annuler(id: number, motif = ''): Observable<DemandeConge> {
     return this.http.post<DemandeConge>(`${this.api}/conges/${id}/annuler/`, { motif });
+  }
+
+  /** Décale le départ — plafonné à trois mois par l'article 44 de la CCIT. */
+  reporter(id: number, dateDebut: string, motif: string): Observable<DemandeConge> {
+    return this.http.post<DemandeConge>(
+      `${this.api}/conges/${id}/reporter/`, { date_debut: dateDebut, motif });
+  }
+
+  /** Rappelle un salarié en service pendant son congé. */
+  rappeler(id: number, motif: string, jour?: string): Observable<DemandeConge> {
+    return this.http.post<DemandeConge>(
+      `${this.api}/conges/${id}/rappeler/`, { motif, jour: jour || null });
+  }
+
+  /** Reprise du congé : les jours travaillés sont rendus (article 44d). */
+  reprendre(id: number, jour?: string): Observable<DemandeConge> {
+    return this.http.post<DemandeConge>(
+      `${this.api}/conges/${id}/reprendre/`, { jour: jour || null });
+  }
+
+  /** Renonce au reliquat ; les jours non pris sont recrédités. */
+  ecourter(id: number, jour?: string): Observable<DemandeConge> {
+    return this.http.post<DemandeConge>(
+      `${this.api}/conges/${id}/ecourter/`, { jour: jour || null });
   }
 
   deposerJustificatif(id: number, fichier: File): Observable<DemandeConge> {

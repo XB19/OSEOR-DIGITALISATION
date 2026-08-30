@@ -1,12 +1,13 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { IconComponent } from '../../shared/icon.component';
 
 @Component({
   selector: 'app-profil',
-  imports: [CommonModule, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
   <div class="entete anim-entree">
     <h1>Mon profil</h1>
@@ -54,9 +55,29 @@ import { IconComponent } from '../../shared/icon.component';
       </button>
     </div>
   </div>
+
+  <div class="carte anim-entree pleine">
+    <h3>Date de naissance</h3>
+    <p class="note">
+      Facultative. Elle ne sert qu'à faire apparaître votre anniversaire
+      dans le calendrier du groupe — laissez-la vide si vous préférez ne
+      pas le partager, et videz le champ pour l'effacer ensuite.
+    </p>
+    <div class="ligne">
+      <input type="date" [(ngModel)]="dateNaissance" [max]="aujourdhui"/>
+      <button class="btn vert" [disabled]="envoiDate()" (click)="enregistrerDate()">
+        @if (envoiDate()) { <span class="spinner petit"></span> Envoi… }
+        @else { Enregistrer }
+      </button>
+    </div>
+  </div>
   `,
   styles: [`
     .entete { margin-bottom: 1rem; }
+    .pleine { margin-top: 1rem; }
+    .ligne { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+    .ligne input { padding: .55rem .7rem; border: 1px solid var(--bord);
+      border-radius: 8px; font-size: .9rem; font-family: inherit; }
     .sous-titre { color: var(--txt-2); font-size: .82rem; margin: .2rem 0 0; }
     .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 820px) { .deux { grid-template-columns: 1fr; } }
@@ -86,7 +107,41 @@ export class ProfilComponent {
   message = signal('');
   messageOk = signal(false);
 
-  constructor(private api: ApiService, public auth: AuthService) {}
+  envoiDate = signal(false);
+  dateNaissance = '';
+  readonly aujourdhui = new Date().toISOString().slice(0, 10);
+
+  constructor(private api: ApiService, public auth: AuthService) {
+    // `date_naissance` n'est servie que sur /auth/me — l'annuaire ne
+    // l'expose à personne d'autre.
+    this.dateNaissance = (this.auth.utilisateur() as any)?.date_naissance ?? '';
+  }
+
+  enregistrerDate(): void {
+    this.envoiDate.set(true);
+    this.message.set('');
+
+    // Champ vidé : on envoie null, ce qui efface la date côté serveur.
+    const donnees = new FormData();
+    donnees.append('date_naissance', this.dateNaissance || '');
+
+    this.api.majMonProfil(donnees).subscribe({
+      next: (u) => {
+        this.envoiDate.set(false);
+        this.auth.utilisateur.set(u);
+        this.messageOk.set(true);
+        this.message.set(this.dateNaissance
+          ? 'Date de naissance enregistrée.'
+          : 'Date de naissance effacée.');
+      },
+      error: (e) => {
+        this.envoiDate.set(false);
+        this.messageOk.set(false);
+        this.message.set(e?.error?.date_naissance?.[0]
+          || e?.error?.detail || "Échec de l'enregistrement.");
+      },
+    });
+  }
 
   choisir(event: Event, champ: 'photo_profil' | 'signature'): void {
     const fichier = (event.target as HTMLInputElement).files?.[0] ?? null;

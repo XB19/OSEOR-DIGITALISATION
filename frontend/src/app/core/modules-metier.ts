@@ -48,8 +48,10 @@ export const MODULES_MOYENS_GENERAUX: ModuleMetier[] = [
     roles: ['COMPTABLE', 'DIRECTEUR', 'ADMINISTRATEUR'],
   },
   {
-    lien: '/bon-sortie-caisse', libelle: 'Bon de sortie de caisse', icone: 'wallet',
-    roles: ['COMPTABLE', 'DIRECTEUR', 'ADMINISTRATEUR'],
+    // Sans restriction de rôle : n'importe quel salarié demande une sortie
+    // de caisse, c'est le destinataire du bon qui autorise. Restreindre ici
+    // reviendrait à cacher le formulaire à ceux qui en ont besoin.
+    lien: '/bon-sortie-caisse', libelle: 'Caisse et bons de sortie', icone: 'wallet',
   },
   {
     lien: '/deplacements', libelle: 'Gestion des déplacements', icone: 'car',
@@ -72,6 +74,12 @@ export const MODULES_VIE_INTERNE: ModuleMetier[] = [
   { lien: '/notes-recues', libelle: 'Notes de service', icone: 'doc' },
   { lien: '/evenements', libelle: 'Événements', icone: 'gift' },
   { lien: '/galerie', libelle: 'Mémoire / Galerie', icone: 'image' },
+  {
+    // Visible seulement pour ceux qui instruisent : un salarié n'y arrive
+    // que par la notification de son propre dossier.
+    lien: '/discipline', libelle: 'Discipline', icone: 'shield',
+    roles: ['RH', 'DIRECTEUR', 'ADMINISTRATEUR'],
+  },
 ];
 
 // Modules déjà implémentés (moteur générique de documents administratifs) :
