@@ -9,6 +9,7 @@ from config.permissions import EstAdministrateur
 from applications.journalisation.services import enregistrer_action
 from .models import ParametreLDAP
 from .serializers import (
+    DatesNaissanceSerializer,
     UtilisateurSerializer,
     UtilisateurEcritureSerializer,
     MoiSerializer,
@@ -41,7 +42,13 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
             return [EstAdministrateur()]
-        return [permissions.IsAuthenticated()]
+
+        # Délègue à DRF pour tout le reste. Une action qui déclare ses
+        # propres `permission_classes` les voit placées dans
+        # `self.permission_classes` ; renvoyer une liste en dur ici les
+        # écrasait, si bien que la synchronisation Active Directory était
+        # ouverte à n'importe quel compte authentifié.
+        return super().get_permissions()
 
     def perform_create(self, serializer):
         u = serializer.save()
@@ -56,6 +63,64 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             self.request.user, "UTILISATEUR_MODIFIE",
             f"{u.nom_complet} ({u.get_role_display()})", objet=u,
         )
+
+    @action(detail=False, methods=["get", "post"],
+            permission_classes=[EstAdministrateur])
+    def dates_naissance(self, request):
+        """
+        Consulte ou renseigne les dates de naissance, d'un bloc.
+
+        Réservé à l'administrateur : c'est une donnée personnelle, absente
+        de l'annuaire ouvert à tous. Elle ne sert qu'aux anniversaires du
+        calendrier, et rien n'oblige un salarié à la fournir — chacun peut
+        aussi la saisir lui-même depuis son profil.
+        """
+        if request.method == "GET":
+            comptes = User.objects.filter(is_active=True).order_by(
+                "last_name", "first_name")
+            return Response([
+                {
+                    "id": u.pk,
+                    "nom_complet": u.nom_complet,
+                    "filiale": u.filiale.nom if u.filiale else None,
+                    "date_naissance": u.date_naissance,
+                }
+                for u in comptes
+            ])
+
+        entree = DatesNaissanceSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+        demandes = entree.validated_data["dates"]
+
+        identifiants = []
+        for cle in demandes:
+            if not str(cle).isdigit():
+                return Response(
+                    {"detail": f"Identifiant invalide : {cle}."}, status=400)
+            identifiants.append(int(cle))
+
+        comptes = {u.pk: u for u in User.objects.filter(pk__in=identifiants)}
+
+        introuvables = [i for i in identifiants if i not in comptes]
+        if introuvables:
+            return Response(
+                {"detail": f"Utilisateur(s) introuvable(s) : "
+                           f"{', '.join(map(str, introuvables))}."},
+                status=400)
+
+        a_enregistrer = []
+        for cle, valeur in demandes.items():
+            compte = comptes[int(cle)]
+            compte.date_naissance = valeur
+            a_enregistrer.append(compte)
+
+        User.objects.bulk_update(a_enregistrer, ["date_naissance"])
+
+        enregistrer_action(
+            request.user, "DATES_NAISSANCE_SAISIES",
+            f"{len(a_enregistrer)} compte(s)")
+
+        return Response({"mis_a_jour": len(a_enregistrer)})
 
     @action(detail=False, methods=["post"], permission_classes=[EstAdministrateur])
     def synchroniser_ad(self, request):

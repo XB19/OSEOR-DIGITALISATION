@@ -29,6 +29,14 @@ class EvenementViewSet(viewsets.ModelViewSet):
     search_fields = ("titre", "description", "lieu")
     ordering_fields = ("date_debut", "titre")
 
+    #: Seul le secrétariat crée un événement.
+    #:
+    #: Un calendrier ouvert à tous se remplit vite de convocations
+    #: fantaisistes, et un événement porte l'apparence d'une communication
+    #: officielle : mieux vaut qu'il en ait aussi la provenance. La
+    #: direction reste incluse — elle arbitre tout.
+    ROLES_CREATION = ("SECRETAIRE", "DIRECTEUR", "ADMINISTRATEUR")
+
     #: Rôles autorisés à modifier un événement dont ils ne sont pas l'auteur.
     ROLES_GESTION = ("SECRETAIRE", "CHEF_SERVICE")
 
@@ -67,6 +75,15 @@ class EvenementViewSet(viewsets.ModelViewSet):
         enregistrer_action(
             request.user, "EVENEMENT_SUPPRIME", evenement.titre, objet=evenement)
         return super().destroy(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        if request.user.role not in self.ROLES_CREATION:
+            return Response(
+                {"detail": "Seul le secrétariat peut créer un événement. "
+                           "Adressez-vous à lui pour faire annoncer le vôtre."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         evenement = serializer.save()

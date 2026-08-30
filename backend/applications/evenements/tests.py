@@ -204,6 +204,48 @@ class AnniversairesTests(BaseEvenements, TestCase):
         self.assertEqual([u.pk for u in celebres], [self.employe.pk])
 
 
+class RappelVeilleTests(BaseEvenements, TestCase):
+    """Rappel de la veille : le temps de s'organiser."""
+
+    def setUp(self):
+        self.creer_donnees()
+        self.employe.date_naissance = date(1990, 3, 15)
+        self.employe.save()
+
+    def test_annonce_la_veille(self):
+        from applications.evenements.services import notifier_anniversaires
+
+        envoyees = notifier_anniversaires(jour=date(2027, 3, 14), dans_jours=1)
+
+        self.assertGreater(envoyees, 0)
+        self.assertTrue(
+            Notification.objects.filter(
+                utilisateur=self.collegue_mg,
+                titre="Anniversaire demain").exists())
+
+    def test_rien_deux_jours_avant(self):
+        from applications.evenements.services import notifier_anniversaires
+
+        self.assertEqual(
+            notifier_anniversaires(jour=date(2027, 3, 13), dans_jours=1), 0)
+
+    def test_l_interesse_n_est_pas_prevenu(self):
+        from applications.evenements.services import notifier_anniversaires
+
+        notifier_anniversaires(jour=date(2027, 3, 14), dans_jours=1)
+
+        self.assertFalse(
+            Notification.objects.filter(utilisateur=self.employe).exists())
+
+    def test_les_deux_taches_sont_planifiees(self):
+        from applications.planification.registre import collecter_taches
+
+        noms = [t["nom"] for t in collecter_taches()]
+
+        self.assertIn("Anniversaires du jour", noms)
+        self.assertIn("Rappel des anniversaires du lendemain", noms)
+
+
 class NotificationAnniversaireTests(BaseEvenements, TestCase):
     def setUp(self):
         self.creer_donnees()
@@ -245,7 +287,7 @@ class EvenementAPITests(BaseEvenements, APITestCase):
         self.creer_donnees()
 
     def test_creation_deduit_auteur_et_filiale(self):
-        self.client.force_authenticate(self.employe)
+        self.client.force_authenticate(self.secretaire)
         reponse = self.client.post("/api/evenements/", {
             "titre": "Pot de départ",
             "type_evenement": Evenement.TypeEvenement.RECEPTION,
@@ -255,17 +297,44 @@ class EvenementAPITests(BaseEvenements, APITestCase):
 
         self.assertEqual(reponse.status_code, 201)
         evenement = Evenement.objects.get(titre="Pot de départ")
-        self.assertEqual(evenement.createur, self.employe)
+        self.assertEqual(evenement.createur, self.secretaire)
         self.assertEqual(evenement.filiale, self.kapi)
 
     def test_dates_incoherentes_refusees_en_400(self):
-        self.client.force_authenticate(self.employe)
+        self.client.force_authenticate(self.secretaire)
         reponse = self.client.post("/api/evenements/", {
             "titre": "Incohérent",
             "date_debut": "2027-05-10T19:00:00Z",
             "date_fin": "2027-05-10T17:00:00Z",
         }, format="json")
         self.assertEqual(reponse.status_code, 400)
+
+    def test_un_salarie_ne_cree_pas_d_evenement(self):
+        """
+        Un calendrier ouvert à tous se remplit de convocations
+        fantaisistes ; un événement a l'apparence d'une communication
+        officielle, il doit en avoir la provenance.
+        """
+        self.client.force_authenticate(self.employe)
+        reponse = self.client.post("/api/evenements/", {
+            "titre": "Fausse réunion",
+            "date_debut": "2027-05-10T17:00:00Z",
+            "date_fin": "2027-05-10T19:00:00Z",
+        }, format="json")
+
+        self.assertEqual(reponse.status_code, 403)
+        self.assertFalse(
+            Evenement.objects.filter(titre="Fausse réunion").exists())
+
+    def test_la_direction_peut_creer(self):
+        self.client.force_authenticate(self.directeur)
+        reponse = self.client.post("/api/evenements/", {
+            "titre": "Assemblée générale",
+            "date_debut": "2027-05-10T17:00:00Z",
+            "date_fin": "2027-05-10T19:00:00Z",
+        }, format="json")
+
+        self.assertEqual(reponse.status_code, 201)
 
     def test_anonyme_refuse(self):
         self.assertIn(

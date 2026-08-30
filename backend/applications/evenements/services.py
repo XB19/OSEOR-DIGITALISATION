@@ -127,20 +127,35 @@ def anniversaires_du_jour(jour=None):
     ]
 
 
-def notifier_anniversaires_du_jour(jour=None):
+def notifier_anniversaires(jour=None, dans_jours=0):
     """
-    Prévient les collègues d'une même filiale des anniversaires du jour.
+    Prévient les collègues d'une même filiale d'un anniversaire.
 
-    La personne concernée n'est pas notifiée de son propre anniversaire.
+    `dans_jours=1` annonce celui de demain — le rappel de veille, qui
+    laisse le temps de s'organiser ; `dans_jours=0` annonce celui du jour.
 
-    Idempotente au sens où l'entend `ACKS_LATE` : ne modifie aucune donnée.
-    Relancée, elle renvoie les mêmes notifications — jamais d'incohérence.
+    La personne concernée n'est jamais notifiée de son propre anniversaire.
+
+    Idempotente au sens d'ACKS_LATE : ne modifie aucune donnée. Relancée,
+    elle renotifie — jamais d'incohérence.
     """
+    from datetime import timedelta
+
     from applications.notifications.services import envoyer_notification
+
+    jour = jour or date.today()
+    cible = jour + timedelta(days=dans_jours)
+
+    if dans_jours == 0:
+        titre = "Anniversaire aujourd'hui"
+        formule = "fête son anniversaire aujourd'hui."
+    else:
+        titre = "Anniversaire demain"
+        formule = f"fête son anniversaire le {cible:%d/%m}."
 
     envoyees = 0
 
-    for celebre in anniversaires_du_jour(jour):
+    for celebre in anniversaires_du_jour(cible):
         if celebre.filiale_id is None:
             continue
 
@@ -150,11 +165,15 @@ def notifier_anniversaires_du_jour(jour=None):
 
         for collegue in collegues:
             envoyer_notification(
-                collegue,
-                "Anniversaire aujourd'hui",
-                f"{celebre.nom_complet} fête son anniversaire aujourd'hui.",
+                collegue, titre,
+                f"{celebre.nom_complet} {formule}",
                 "INFO",
             )
             envoyees += 1
 
     return envoyees
+
+
+def notifier_anniversaires_du_jour(jour=None):
+    """Anniversaires du jour même. Conservée : la tâche existante l'appelle."""
+    return notifier_anniversaires(jour, dans_jours=0)

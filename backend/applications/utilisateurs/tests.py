@@ -77,3 +77,91 @@ class AnnuaireTests(APITestCase):
         self.assertEqual(reponse.status_code, 200)
         self.collegue.refresh_from_db()
         self.assertEqual(self.collegue.date_embauche, date(2015, 1, 1))
+
+
+class DatesNaissanceTests(APITestCase):
+    """
+    Saisie des dates de naissance : par soi-même depuis son profil, ou en
+    masse par l'administrateur. Sans elles, aucun anniversaire ne s'affiche.
+    """
+
+    def setUp(self):
+        self.kapi = Filiale.objects.create(nom="KAPI Consult", code="KAPI")
+        self.admin = User.objects.create_user(
+            "admin", password="x", role=User.Role.ADMINISTRATEUR,
+            filiale=self.kapi)
+        self.employe = User.objects.create_user(
+            "employe", password="x", role=User.Role.EMPLOYE, filiale=self.kapi)
+        self.collegue = User.objects.create_user(
+            "collegue", password="x", role=User.Role.EMPLOYE, filiale=self.kapi)
+
+    def test_chacun_renseigne_la_sienne(self):
+        self.client.force_authenticate(self.employe)
+
+        reponse = self.client.patch(
+            "/api/auth/me/", {"date_naissance": "1990-03-15"},
+            format="multipart")
+
+        self.assertEqual(reponse.status_code, 200)
+        self.employe.refresh_from_db()
+        self.assertEqual(self.employe.date_naissance, date(1990, 3, 15))
+
+    def test_saisie_groupee_par_l_administrateur(self):
+        self.client.force_authenticate(self.admin)
+
+        reponse = self.client.post("/api/utilisateurs/dates_naissance/", {
+            "dates": {
+                str(self.employe.pk): "1990-03-15",
+                str(self.collegue.pk): "1985-07-02",
+            },
+        }, format="json")
+
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.data["mis_a_jour"], 2)
+        self.employe.refresh_from_db()
+        self.assertEqual(self.employe.date_naissance, date(1990, 3, 15))
+
+    def test_liste_pour_saisie(self):
+        self.client.force_authenticate(self.admin)
+        reponse = self.client.get("/api/utilisateurs/dates_naissance/")
+
+        self.assertEqual(reponse.status_code, 200)
+        self.assertGreaterEqual(len(reponse.data), 3)
+        self.assertIn("date_naissance", reponse.data[0])
+
+    def test_reservee_a_l_administrateur(self):
+        """Donnée personnelle : absente de l'annuaire, saisie encadrée."""
+        self.client.force_authenticate(self.employe)
+        reponse = self.client.get("/api/utilisateurs/dates_naissance/")
+        self.assertEqual(reponse.status_code, 403)
+
+    def test_utilisateur_introuvable(self):
+        self.client.force_authenticate(self.admin)
+        reponse = self.client.post("/api/utilisateurs/dates_naissance/", {
+            "dates": {"999999": "1990-03-15"},
+        }, format="json")
+
+        self.assertEqual(reponse.status_code, 400)
+
+    def test_effacement_possible(self):
+        self.employe.date_naissance = date(1990, 3, 15)
+        self.employe.save()
+
+        self.client.force_authenticate(self.admin)
+        self.client.post("/api/utilisateurs/dates_naissance/", {
+            "dates": {str(self.employe.pk): None},
+        }, format="json")
+
+        self.employe.refresh_from_db()
+        self.assertIsNone(self.employe.date_naissance)
+
+    def test_synchronisation_ad_reservee_a_l_administrateur(self):
+        """
+        Régression : l'override de `get_permissions` renvoyait une liste en
+        dur, écrasant les `permission_classes` déclarées sur les actions.
+        La synchronisation Active Directory était de ce fait ouverte à tout
+        compte authentifié.
+        """
+        self.client.force_authenticate(self.employe)
+        reponse = self.client.post("/api/utilisateurs/synchroniser_ad/")
+        self.assertEqual(reponse.status_code, 403)

@@ -147,7 +147,28 @@ class MoiEcritureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("photo_profil", "signature")
+        # `date_naissance` est facultative et se saisit soi-même : elle
+        # n'alimente que les anniversaires du calendrier, et personne n'est
+        # tenu de la donner. L'administrateur peut la renseigner à la place
+        # de qui le souhaite (cf. `dates_naissance` côté API).
+        fields = ("photo_profil", "signature", "date_naissance")
+
+
+class DatesNaissanceSerializer(serializers.Serializer):
+    """
+    Saisie groupée des dates de naissance.
+
+    Les anniversaires du calendrier se déduisent de `date_naissance` ; sans
+    elle rien ne s'affiche. Chacun peut renseigner la sienne depuis son
+    profil, mais personne ne le fait spontanément : l'administrateur a donc
+    besoin de les saisir d'un bloc au démarrage.
+    """
+
+    dates = serializers.DictField(
+        child=serializers.DateField(allow_null=True),
+        help_text="Identifiant d'utilisateur -> date de naissance "
+                  "(null pour effacer).",
+    )
 
 
 class ParametreLDAPSerializer(serializers.ModelSerializer):
