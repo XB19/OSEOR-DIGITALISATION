@@ -101,6 +101,8 @@ class DemandeConge(models.Model):
         VALIDEE = "VALIDEE", "Validée"
         REFUSEE = "REFUSEE", "Refusée"
         ANNULEE = "ANNULEE", "Annulée"
+        INTERROMPUE = "INTERROMPUE", "Interrompue (rappel en service)"
+        TERMINEE = "TERMINEE", "Terminée"
 
     utilisateur = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -165,6 +167,48 @@ class DemandeConge(models.Model):
         default=Statut.EN_ATTENTE
     )
 
+    date_debut_initiale = models.DateField(
+        verbose_name="Date de départ initialement prévue",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Conservée lors d'un report, pour vérifier le plafond de "
+                  "trois mois de l'article 44 de la CCIT."
+    )
+
+    motif_report = models.TextField(
+        verbose_name="Motif du report",
+        blank=True
+    )
+
+    date_rappel = models.DateField(
+        verbose_name="Date de rappel en service",
+        null=True,
+        blank=True,
+        help_text="Jour où le salarié a été rappelé pendant son congé."
+    )
+
+    motif_rappel = models.TextField(
+        verbose_name="Motif du rappel",
+        blank=True
+    )
+
+    rappele_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Rappelé par",
+        on_delete=models.SET_NULL,
+        related_name="conges_rappeles",
+        null=True,
+        blank=True
+    )
+
+    date_reprise = models.DateField(
+        verbose_name="Date de reprise du congé",
+        null=True,
+        blank=True,
+        help_text="Jour où le salarié est reparti en congé après son rappel."
+    )
+
     etape_validation = models.PositiveSmallIntegerField(
         verbose_name="Étape de validation courante",
         default=0,
@@ -219,6 +263,41 @@ class DemandeConge(models.Model):
     def __str__(self):
         return (f"{self.utilisateur.nom_complet} — "
                 f"{self.date_debut:%d/%m/%Y} au {self.date_fin:%d/%m/%Y}")
+
+    @property
+    def a_ete_reportee(self):
+        """True si la date de départ a été décalée après coup."""
+        return bool(self.date_debut_initiale
+                    and self.date_debut_initiale != self.date_debut)
+
+    @property
+    def est_interrompue(self):
+        return self.statut == self.Statut.INTERROMPUE
+
+    @property
+    def jours_travailles_pendant_le_conge(self):
+        """
+        Jours ouvrés travaillés entre le rappel et la reprise.
+
+        L'article 44d de la CCIT les rend au salarié : « si pour des raisons
+        de service le travailleur en congé est rappelé, son congé sera
+        prolongé des jours ainsi travaillés ». Ce n'est donc pas du congé
+        consommé.
+        """
+        from .calendrier import compter_jours_ouvres
+
+        if not self.date_rappel:
+            return 0
+
+        fin = self.date_reprise or self.date_fin
+        if fin < self.date_rappel:
+            return 0
+
+        return compter_jours_ouvres(self.date_rappel, fin, self.filiale_salarie)
+
+    @property
+    def filiale_salarie(self):
+        return getattr(self.utilisateur, "filiale", None)
 
     @property
     def est_en_cours(self):

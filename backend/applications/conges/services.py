@@ -16,7 +16,7 @@ somme de TOUS ses mouvements, toutes années confondues.
 """
 
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -279,6 +279,68 @@ def expirer_tous_les_soldes(annee=None):
 # =====================================================================
 # Consommation liée aux demandes
 # =====================================================================
+
+def rappeler_departs_imminents(dans_jours=1, jour=None):
+    """
+    Prévient d'un départ en congé imminent : le salarié, son valideur, et
+    les observateurs du circuit.
+
+    L'article 44 impose de communiquer l'ordre de départ au moins quinze
+    jours à l'avance ; ce rappel de veille est le filet complémentaire,
+    celui qui évite qu'une équipe découvre une absence le matin même.
+
+    Idempotente au sens d'ACKS_LATE : elle ne modifie aucune donnée, elle
+    renotifie. Relancée, elle réenvoie — jamais d'incohérence.
+    """
+    from applications.notifications.services import envoyer_notification
+    from applications.validation.services import notifier_observateurs
+
+    from .circuits import circuit_pour
+    from .models import DemandeConge
+
+    jour = jour or date.today()
+    cible = jour + timedelta(days=dans_jours)
+
+    departs = DemandeConge.objects.filter(
+        statut=DemandeConge.Statut.VALIDEE, date_debut=cible,
+    ).select_related("utilisateur", "valideur")
+
+    prevenus = 0
+    for demande in departs:
+        envoyer_notification(
+            demande.utilisateur,
+            "Départ en congé demain",
+            f"Votre congé débute le {demande.date_debut:%d/%m/%Y} et se "
+            f"termine le {demande.date_fin:%d/%m/%Y} "
+            f"({demande.jours_ouvres} j).",
+            "INFO",
+            objet=demande,
+        )
+        prevenus += 1
+
+        if demande.valideur_id:
+            envoyer_notification(
+                demande.valideur,
+                "Départ en congé demain",
+                f"{demande.utilisateur.nom_complet} part en congé le "
+                f"{demande.date_debut:%d/%m/%Y} "
+                f"(retour le {demande.date_fin:%d/%m/%Y}).",
+                "INFO",
+                objet=demande,
+            )
+            prevenus += 1
+
+        prevenus += notifier_observateurs(
+            demande, circuit_pour(demande),
+            "Départ en congé demain",
+            f"{demande.utilisateur.nom_complet} — "
+            f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y} "
+            f"({demande.jours_ouvres} j)",
+            exclure=(demande.utilisateur, demande.valideur),
+        )
+
+    return prevenus
+
 
 def consommer(demande):
     """

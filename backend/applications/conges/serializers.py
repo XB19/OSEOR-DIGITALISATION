@@ -30,6 +30,8 @@ class DemandeCongeSerializer(serializers.ModelSerializer):
             "justificatif_attendu", "date_limite_justificatif",
             "justificatif_en_retard",
             "date_debut", "date_fin", "jours_ouvres", "motif",
+            "date_debut_initiale", "motif_report",
+            "date_rappel", "motif_rappel", "date_reprise",
             "statut", "statut_libelle",
             "valideur", "valideur_nom", "date_decision", "motif_decision",
             "date_creation",
@@ -52,6 +54,26 @@ class DepotDemandeSerializer(serializers.Serializer):
     motif_permission = serializers.CharField(
         required=False, allow_blank=True, default="")
     date_evenement = serializers.DateField(required=False, allow_null=True)
+
+
+class ReportSerializer(serializers.Serializer):
+    """Report du départ. Le motif est obligatoire : le salarié doit savoir."""
+
+    date_debut = serializers.DateField()
+    motif = serializers.CharField()
+
+
+class RappelSerializer(serializers.Serializer):
+    """Rappel en service pendant le congé."""
+
+    motif = serializers.CharField()
+    jour = serializers.DateField(required=False, allow_null=True)
+
+
+class RepriseSerializer(serializers.Serializer):
+    """Reprise du congé, ou renoncement au reliquat."""
+
+    jour = serializers.DateField(required=False, allow_null=True)
 
 
 class BaremePermissionSerializer(serializers.Serializer):

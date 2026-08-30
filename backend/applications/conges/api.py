@@ -11,9 +11,10 @@ from .models import DemandeConge, JourFerie, MouvementConge
 from .serializers import (
     AnnulationSerializer, BaremePermissionSerializer, DecisionSerializer,
     DemandeCongeSerializer, DepotDemandeSerializer, JourFerieSerializer,
-    MouvementCongeSerializer,
+    MouvementCongeSerializer, RappelSerializer, ReportSerializer,
+    RepriseSerializer,
 )
-from . import services, workflow
+from . import parcours, services, workflow
 from .workflow import DemandeRefusee
 
 
@@ -96,6 +97,76 @@ class DemandeCongeViewSet(mixins.ListModelMixin,
         try:
             demande = workflow.annuler(
                 self.get_object(), request.user, entree.validated_data["motif"])
+        except DemandeRefusee as erreur:
+            return Response({"detail": str(erreur)}, status=400)
+
+        return Response(DemandeCongeSerializer(demande).data)
+
+    @action(detail=True, methods=["post"])
+    def reporter(self, request, pk=None):
+        """
+        Décale le départ, dans la limite de trois mois fixée par l'article
+        44 de la Convention Collective.
+        """
+        entree = ReportSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+
+        try:
+            demande = parcours.reporter(
+                self.get_object(), entree.validated_data["date_debut"],
+                request.user, entree.validated_data["motif"])
+        except DemandeRefusee as erreur:
+            return Response({"detail": str(erreur)}, status=400)
+
+        return Response(DemandeCongeSerializer(demande).data)
+
+    @action(detail=True, methods=["post"])
+    def rappeler(self, request, pk=None):
+        """Rappelle un salarié en service pendant son congé."""
+        entree = RappelSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+
+        try:
+            demande = parcours.rappeler(
+                self.get_object(), request.user,
+                entree.validated_data["motif"],
+                entree.validated_data.get("jour"))
+        except DemandeRefusee as erreur:
+            return Response({"detail": str(erreur)}, status=400)
+
+        return Response(DemandeCongeSerializer(demande).data)
+
+    @action(detail=True, methods=["post"])
+    def reprendre(self, request, pk=None):
+        """
+        Reprise du congé après rappel : les jours travaillés sont rendus
+        (article 44d).
+        """
+        entree = RepriseSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+
+        try:
+            demande = parcours.reprendre(
+                self.get_object(), request.user,
+                entree.validated_data.get("jour"))
+        except DemandeRefusee as erreur:
+            return Response({"detail": str(erreur)}, status=400)
+
+        return Response(DemandeCongeSerializer(demande).data)
+
+    @action(detail=True, methods=["post"])
+    def ecourter(self, request, pk=None):
+        """
+        Le salarié renonce au reliquat de son congé ; les jours non pris
+        lui sont recrédités.
+        """
+        entree = RepriseSerializer(data=request.data)
+        entree.is_valid(raise_exception=True)
+
+        try:
+            demande = parcours.renoncer_au_reliquat(
+                self.get_object(), request.user,
+                entree.validated_data.get("jour"))
         except DemandeRefusee as erreur:
             return Response({"detail": str(erreur)}, status=400)
 

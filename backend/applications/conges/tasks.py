@@ -55,7 +55,22 @@ def expirer_soldes(annee=None, forcer=False):
     return str(services.expirer_tous_les_soldes(annee))
 
 
+@shared_task(name="conges.rappeler_departs")
+def rappeler_departs():
+    """Rappelle la veille aux salariés dont le congé commence demain."""
+    return services.rappeler_departs_imminents()
+
+
 TACHES_PLANIFIEES = [
+    {
+        "nom": "Rappel des départs en congé",
+        "tache": "conges.rappeler_departs",
+        "crontab": {"minute": "0", "hour": "16"},
+        "description": (
+            "Chaque jour à 16h, prévient le salarié, son valideur et les "
+            "RH d'un départ en congé le lendemain."
+        ),
+    },
     {
         "nom": "Acquisition mensuelle des congés",
         "tache": "conges.crediter_acquisitions",
