@@ -308,6 +308,10 @@ def payer(bon, acteur, jour=None):
         bon.statut = BonSortie.Statut.PAYE
         bon.save(update_fields=["statut", "date_modification"])
 
+        # La pièce imprimable naît au décaissement : c'est le moment où le
+        # bon devient un justificatif comptable.
+        engendrer_piece(bon)
+
         enregistrer_action(
             acteur, "BON_SORTIE_PAYE",
             f"{bon.reference} — {bon.montant}", objet=bon)
@@ -317,6 +321,73 @@ def payer(bon, acteur, jour=None):
         f"{bon.reference} — {bon.montant} remis.", "SUCCESS", objet=bon)
 
     return bon
+
+
+def engendrer_piece(bon):
+    """
+    Fabrique la pièce imprimable du bon, au format du moteur documentaire.
+
+    Le bon de caisse détient la vérité — montant, autorisation, mouvement
+    d'argent. Le `Document` engendré ici n'est que sa forme papier : c'est
+    lui que le générateur PDF sait mettre en page, et lui qu'on archive.
+    Les deux ne se concurrencent pas, l'un découle de l'autre.
+
+    Idempotente : un bon n'a qu'une pièce, même si le décaissement est
+    rejoué.
+    """
+    from applications.documents.models import Document, TypeDocument
+    from applications.validation.services import decisions
+
+    if bon.document_id:
+        return bon.document
+
+    entete = {
+        "caisse": bon.caisse.nom,
+        "beneficiaire": bon.demandeur.nom_complet,
+        "objet": bon.objet,
+        "reference_bon": bon.reference,
+    }
+    if bon.destinataire_id:
+        entete["autorise_par"] = bon.destinataire.nom_complet
+    if bon.moyen_transport:
+        entete["moyen_transport"] = bon.get_moyen_transport_display()
+
+    # L'historique de visas reprend les décisions réellement prises dans le
+    # circuit : la pièce imprimée doit montrer qui a autorisé, pas une
+    # chaîne théorique.
+    historique = [{
+        "etape": index,
+        "cle": decision.etape_cle,
+        "libelle": decision.etape_libelle,
+        "utilisateur_id": decision.acteur_id,
+        "utilisateur_nom": decision.acteur.nom_complet,
+        "decision": "VALIDE" if decision.sens == "VALIDEE" else "REFUSE",
+        "commentaire": decision.commentaire,
+        "date": decision.date_decision.isoformat(),
+        "a_une_signature": bool(decision.acteur.signature),
+    } for index, decision in enumerate(decisions(bon))]
+
+    document = Document.objects.create(
+        filiale=bon.caisse.filiale,
+        type_document=TypeDocument.BON_SORTIE_CAISSE,
+        numero=bon.reference,
+        demandeur=bon.demandeur,
+        champs_entete=entete,
+        lignes=[{
+            "objet": bon.objet,
+            "montant_debit": str(bon.montant),
+            "montant_credit": "",
+        }],
+        montant_total=bon.montant,
+        statut=Document.Statut.VALIDE,
+        etape_visa_courante=len(historique),
+        historique_visas=historique,
+    )
+
+    bon.document = document
+    bon.save(update_fields=["document", "date_modification"])
+
+    return document
 
 
 def rendre_monnaie(bon, montant, acteur, motif="", jour=None):

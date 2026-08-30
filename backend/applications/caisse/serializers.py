@@ -85,7 +85,7 @@ class BonSortieSerializer(serializers.ModelSerializer):
             "moyen_transport", "moyen_libelle", "exige_justificatif",
             "justificatif", "statut", "statut_libelle", "motif_decision",
             "montant_paye", "montant_rendu", "montant_consomme",
-            "date_creation",
+            "document", "date_creation",
         )
         read_only_fields = fields
 

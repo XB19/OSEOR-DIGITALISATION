@@ -329,6 +329,18 @@ class BonSortie(models.Model):
         blank=True
     )
 
+    document = models.OneToOneField(
+        "documents.Document",
+        verbose_name="Pièce imprimable",
+        on_delete=models.SET_NULL,
+        related_name="bon_sortie_caisse",
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Bon de sortie de caisse au format du moteur documentaire, "
+                  "engendré au décaissement pour l'impression et l'archivage."
+    )
+
     date_creation = models.DateTimeField(
         verbose_name="Date de création",
         auto_now_add=True

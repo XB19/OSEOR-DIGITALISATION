@@ -170,9 +170,24 @@ class DocumentEcritureSerializer(serializers.ModelSerializer):
         model = Document
         fields = ("type_document", "champs_entete", "lignes", "piece_jointe", "document_source")
 
+    #: Types qu'on ne saisit plus directement : ils sont engendrés par le
+    #: module qui en détient la vérité. Un bon de sortie de caisse naît
+    #: d'une demande sur une caisse (montant, autorisation, décaissement) ;
+    #: le laisser créer à la main produirait deux bons de sortie
+    #: concurrents, dont l'un ne toucherait aucune caisse.
+    TYPES_ENGENDRES = {TypeDocument.BON_SORTIE_CAISSE: "/api/bons-sortie/"}
+
     def create(self, validated_data):
         request = self.context["request"]
         demandeur = request.user
+
+        type_demande = validated_data["type_document"]
+        if type_demande in self.TYPES_ENGENDRES:
+            raise serializers.ValidationError(
+                f"Un {TypeDocument(type_demande).label.lower()} se crée depuis "
+                f"la caisse ({self.TYPES_ENGENDRES[type_demande]}) : la pièce "
+                f"imprimable est engendrée au décaissement."
+            )
         filiale = demandeur.filiale
         if filiale is None:
             raise serializers.ValidationError(

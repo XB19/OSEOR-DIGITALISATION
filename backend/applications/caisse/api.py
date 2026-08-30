@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -204,6 +205,31 @@ class BonSortieViewSet(mixins.ListModelMixin,
         bon = self.get_object()
         bon.refresh_from_db()
         return Response(BonSortieSerializer(bon).data)
+
+    @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        """
+        Bon de sortie au format imprimable.
+
+        Le PDF est produit à partir de la pièce engendrée au décaissement :
+        aucun format spécifique à maintenir ici, c'est le générateur du
+        moteur documentaire qui s'en charge.
+        """
+        from applications.documents.pdf import generer_pdf_document
+
+        bon = self.get_object()
+
+        if not bon.document_id:
+            return Response(
+                {"detail": "La pièce imprimable est engendrée au "
+                           "décaissement : ce bon n'a pas encore été payé."},
+                status=400)
+
+        contenu = generer_pdf_document(bon.document)
+        reponse = HttpResponse(contenu, content_type="application/pdf")
+        reponse["Content-Disposition"] = (
+            f'inline; filename="{bon.reference}.pdf"')
+        return reponse
 
     @action(detail=False, methods=["get"])
     def a_autoriser(self, request):
