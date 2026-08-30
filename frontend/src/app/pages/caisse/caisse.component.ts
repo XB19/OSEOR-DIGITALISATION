@@ -260,27 +260,37 @@ import {
             <label>Justificatif</label>
             <input type="file" (change)="choisirFichier($event)"/>
           }
-        } @else {
-          <label>Adressé à (personne qui autorise)</label>
-          <select [(ngModel)]="destinataire">
-            <option [ngValue]="null">— choisir —</option>
-            @for (p of approbateurs(); track p.id) {
-              <option [ngValue]="p.id">{{ p.nom_complet }} — {{ p.role_libelle }}</option>
-            }
-          </select>
-          @if (regles(); as r) {
-            <p class="encart">
-              Au-delà de {{ montant(r.seuil_direction) }}, seule la direction
-              peut autoriser. En deçà, un chef de service suffit.
-            </p>
-          }
         }
 
         <label>Objet</label>
         <input [(ngModel)]="objet" placeholder="Fournitures de bureau"/>
 
         <label>Montant</label>
-        <input type="number" [(ngModel)]="montantSaisi" min="1"/>
+        <input type="number" [(ngModel)]="montantSaisi" min="1"
+               (ngModelChange)="montantChange()"/>
+
+        @if (typeDepense !== 'TRANSPORT') {
+          <label>Adressé à (personne qui autorise)</label>
+          <select [(ngModel)]="destinataire">
+            <option [ngValue]="null">— choisir —</option>
+            @for (p of approbateursAdmis(); track p.id) {
+              <option [ngValue]="p.id">{{ p.nom_complet }} — {{ p.role_libelle }}</option>
+            }
+          </select>
+          @if (regles(); as r) {
+            <p class="encart">
+              @if (exigeDirection()) {
+                Au-delà de {{ montant(r.seuil_direction) }}, seule la
+                direction peut autoriser : la liste est réduite en
+                conséquence.
+              } @else {
+                Au-delà de {{ montant(r.seuil_direction) }}, seule la
+                direction pourra autoriser. En deçà, un chef de service
+                suffit.
+              }
+            </p>
+          }
+        }
 
         <div class="pied">
           <button class="btn fantome" (click)="bonOuvert.set(false)">Annuler</button>
@@ -525,17 +535,48 @@ export class CaisseComponent implements OnInit {
   }
 
   private chargerApprobateurs(): void {
-    // Les rôles admis dépendent du montant : on propose ceux qui peuvent
-    // autoriser au moins les petites dépenses, et le serveur tranche
-    // ensuite selon le seuil. Une liste courte vaut mieux qu'un annuaire
-    // entier où le demandeur chercherait au hasard.
-    const admis = this.regles()?.roles_sous_seuil ?? [];
-
     this.api.utilisateurs().subscribe({
-      next: (r: any) => this.approbateurs.set(
-        (r.results ?? []).filter((u: any) => admis.includes(u.role))),
+      next: (r: any) => this.approbateurs.set(r.results ?? []),
       error: () => this.approbateurs.set([]),
     });
+  }
+
+  /**
+   * Un montant relevé peut rendre le destinataire déjà choisi
+   * insuffisant : on efface alors la sélection plutôt que de laisser
+   * partir un bon que le serveur refusera.
+   */
+  montantChange(): void {
+    if (this.destinataire === null) return;
+    const admis = this.approbateursAdmis();
+    if (!admis.some((u: any) => u.id === this.destinataire)) {
+      this.destinataire = null;
+    }
+  }
+
+  /** Le montant saisi dépasse-t-il le seuil au-delà duquel il faut la direction ? */
+  exigeDirection(): boolean {
+    const seuil = Number(this.regles()?.seuil_direction ?? 0);
+    return !!seuil && Number(this.montantSaisi) > seuil;
+  }
+
+  /**
+   * Destinataires proposés pour le montant en cours.
+   *
+   * Le niveau exigé dépend du montant : au-delà du seuil, un chef de
+   * service ne suffit plus. Proposer quand même toute la liste ferait
+   * choisir quelqu'un que le serveur refuserait ensuite. Tant que les
+   * règles ne sont pas chargées on montre tout le monde : mieux vaut un
+   * refus au dépôt qu'une liste vide sans explication.
+   */
+  approbateursAdmis(): any[] {
+    const regles = this.regles();
+    if (!regles) return this.approbateurs();
+
+    const admis = this.exigeDirection()
+      ? regles.roles_au_dessus : regles.roles_sous_seuil;
+
+    return this.approbateurs().filter((u: any) => admis.includes(u.role));
   }
 
   deposerBon(): void {
