@@ -1,12 +1,19 @@
 """
 Parcours d'une demande de congé : dépôt, validation, refus, annulation.
 
-Qui valide se lit dans l'organigramme, via `Utilisateur.valideur_conge` :
-le responsable hiérarchique direct, à défaut le chef de service, et si
-personne n'est désigné, les RH prennent le relais. C'est la différence
-avec la chaîne de visas des documents administratifs, qui s'adresse à un
-RÔLE : un congé se valide par **mon** responsable, pas par n'importe quel
-chef de service du groupe.
+Le parcours de validation lui-même est décrit dans `circuits.py` et
+exécuté par le socle commun (`applications.validation`) : un congé passe
+par le responsable hiérarchique puis par la direction, une demande de
+directeur par les RH puis par un pair, une permission par le seul
+responsable.
+
+Ce qui reste ici, c'est le métier propre aux congés : contrôle du solde,
+des chevauchements, du barème conventionnel, et les écritures au registre.
+
+Qui valide se lit dans l'organigramme, non dans les rôles : un congé se
+valide par **mon** responsable, pas par n'importe quel chef de service du
+groupe. C'est la différence de fond avec la chaîne de visas documentaire,
+et le socle porte les deux modes de désignation.
 """
 
 from django.db import transaction
@@ -16,8 +23,13 @@ from applications.journalisation.services import enregistrer_action
 from applications.notifications.services import envoyer_notification
 from config.permissions import RH, est_direction
 
+from applications.validation import services as validation
+from applications.validation.circuits import peut_agir, resoudre_acteurs
+from applications.validation.services import ValidationRefusee
+
 from . import services
 from .calendrier import compter_jours_ouvres
+from .circuits import circuit_pour
 from .convention import (
     ANCIENNETE_REQUISE_MOIS, exige_anciennete, jours_accordes, regle,
 )
@@ -30,38 +42,41 @@ class DemandeRefusee(Exception):
 
 def valideurs_possibles(demande):
     """
-    Qui peut trancher cette demande.
-
-    Toujours la direction (elle arbitre tout) et les RH (filet de sécurité
-    quand aucun responsable n'est renseigné), plus le valideur désigné par
-    l'organigramme.
+    Identifiants des personnes pouvant trancher la demande à son étape
+    courante — acteurs de l'étape, plus les autorités qui peuvent valider
+    directement.
     """
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
+    circuit = circuit_pour(demande)
+    etape = circuit.etape(demande.etape_validation)
+    if etape is None:
+        return set()
 
     identifiants = set(
-        User.objects.filter(
-            is_active=True, role__in=("ADMINISTRATEUR", "DIRECTEUR", RH),
-        ).values_list("pk", flat=True)
-    )
+        resoudre_acteurs(etape, demande.utilisateur, demande))
 
-    valideur = demande.utilisateur.valideur_conge
-    if valideur is not None:
-        identifiants.add(valideur.pk)
+    # Les autorités en aval peuvent conclure sans attendre.
+    for suivante in circuit.etapes[demande.etape_validation:]:
+        if suivante.autorite:
+            identifiants |= resoudre_acteurs(
+                suivante, demande.utilisateur, demande)
 
-    # Personne ne valide sa propre demande, quel que soit son rôle.
     identifiants.discard(demande.utilisateur_id)
-
     return identifiants
 
 
 def peut_valider(demande, utilisateur):
-    if demande.utilisateur_id == utilisateur.pk:
+    """True si `utilisateur` peut trancher l'étape courante."""
+    if demande.statut != DemandeConge.Statut.EN_ATTENTE:
         return False
-    if est_direction(utilisateur) or utilisateur.role == RH:
-        return True
-    return utilisateur.pk in valideurs_possibles(demande)
+    return peut_agir(
+        circuit_pour(demande), demande.etape_validation,
+        utilisateur, demande.utilisateur, demande,
+    )
+
+
+def etape_courante(demande):
+    """Étape de validation en cours, ou None si le circuit est terminé."""
+    return circuit_pour(demande).etape(demande.etape_validation)
 
 
 def _chevauchement(utilisateur, date_debut, date_fin, exclure=None):
@@ -190,62 +205,110 @@ def deposer(utilisateur, type_conge, date_debut, date_fin, motif="",
 
 
 def _notifier_valideurs(demande):
-    from django.contrib.auth import get_user_model
+    """Prévient les acteurs de l'étape courante du circuit."""
+    circuit = circuit_pour(demande)
+    etape = circuit.etape(demande.etape_validation)
+    libelle = etape.libelle if etape else "Validation"
 
-    User = get_user_model()
-
-    valideur = demande.utilisateur.valideur_conge
-    destinataires = (
-        [valideur] if valideur is not None
-        else list(User.objects.filter(is_active=True, role=RH))
+    return validation.notifier_etape(
+        demande, circuit, demande.etape_validation, demande.utilisateur,
+        "Demande de congé à valider",
+        f"{demande.utilisateur.nom_complet} — "
+        f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y} "
+        f"({demande.jours_ouvres} j) — {libelle}",
     )
 
-    for destinataire in destinataires:
-        envoyer_notification(
-            destinataire,
-            "Demande de congé à valider",
-            f"{demande.utilisateur.nom_complet} — "
-            f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y} "
-            f"({demande.jours_ouvres} j)",
-            "INFO",
-            objet=demande,
-        )
+
+def _informer_observateurs(demande, entete, type_notification="INFO"):
+    """
+    Tient RH et comptabilité au courant, sans jamais les solliciter.
+
+    Ils reçoivent l'information complète : qui s'absente, quand, combien de
+    jours, et qui a tranché.
+    """
+    valideur = demande.valideur.nom_complet if demande.valideur else "—"
+
+    return validation.notifier_observateurs(
+        demande, circuit_pour(demande), entete,
+        f"{demande.utilisateur.nom_complet} — {demande.get_type_conge_display()} — "
+        f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y} "
+        f"({demande.jours_ouvres} j) — décision : {valideur}",
+        type_notification,
+        exclure=(demande.utilisateur, demande.valideur),
+    )
 
 
 def decider(demande, valideur, approuvee, motif=""):
     """
-    Valide ou refuse une demande, et débite le solde le cas échéant.
+    Tranche l'étape courante du circuit.
 
-    Le débit et le changement de statut sont dans la même transaction :
-    une demande validée dont le solde n'aurait pas bougé donnerait des
-    jours gratuits.
+    Une validation ne clôt la demande que si le circuit est épuisé : le
+    congé d'un salarié demande l'accord du responsable PUIS de la
+    direction. Une autorité peut cependant conclure seule — la décision
+    consigne alors les étapes qu'elle a sautées.
+
+    Le débit du solde et le changement de statut sont dans la même
+    transaction : une demande validée dont le solde n'aurait pas bougé
+    donnerait des jours gratuits. La demande est relue sous verrou, sans
+    quoi deux validations simultanées passeraient toutes deux le contrôle
+    de statut et consommeraient le solde en double.
     """
-    if demande.statut != DemandeConge.Statut.EN_ATTENTE:
-        raise DemandeRefusee("Cette demande a déjà été traitée.")
-
-    if not peut_valider(demande, valideur):
-        raise DemandeRefusee("Vous n'êtes pas habilité à traiter cette demande.")
+    circuit = circuit_pour(demande)
+    # L'appelant garde une référence sur SON instance : on travaille sur une
+    # copie verrouillée, puis on la resynchronise avant de rendre la main.
+    # Sans cela il observerait un objet périmé et croirait la décision sans
+    # effet.
+    demande_appelant = demande
 
     with transaction.atomic():
-        demande.statut = (
-            DemandeConge.Statut.VALIDEE if approuvee
-            else DemandeConge.Statut.REFUSEE
+        demande = (
+            DemandeConge.objects
+            .select_for_update()
+            .select_related("utilisateur", "valideur")
+            .get(pk=demande.pk)
         )
+
+        if demande.statut != DemandeConge.Statut.EN_ATTENTE:
+            raise DemandeRefusee("Cette demande a déjà été traitée.")
+
+        try:
+            decision, etape_suivante = validation.enregistrer_decision(
+                demande, circuit, demande.etape_validation, valideur,
+                demande.utilisateur, approuvee, motif,
+            )
+        except ValidationRefusee as erreur:
+            raise DemandeRefusee(str(erreur)) from erreur
+
+        demande.etape_validation = etape_suivante
         demande.valideur = valideur
         demande.date_decision = timezone.now()
         demande.motif_decision = motif
+
+        if not approuvee:
+            demande.statut = DemandeConge.Statut.REFUSEE
+        elif etape_suivante >= len(circuit):
+            demande.statut = DemandeConge.Statut.VALIDEE
+
         demande.save()
 
-        if approuvee:
+        if demande.statut == DemandeConge.Statut.VALIDEE:
             services.consommer(demande)
 
         enregistrer_action(
             valideur,
             "CONGE_VALIDE" if approuvee else "CONGE_REFUSE",
             f"{demande.utilisateur.nom_complet} — "
-            f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y}",
+            f"{demande.date_debut:%d/%m/%Y} au {demande.date_fin:%d/%m/%Y}"
+            + (" (validation directe)" if decision.validation_directe else ""),
             objet=demande,
         )
+
+    # Notifications hors transaction : une panne d'envoi ne doit pas
+    # annuler une décision déjà prise.
+    if demande.statut == DemandeConge.Statut.EN_ATTENTE:
+        _notifier_valideurs(demande)
+        demande_appelant.refresh_from_db()
+        return demande_appelant
 
     envoyer_notification(
         demande.utilisateur,
@@ -256,7 +319,14 @@ def decider(demande, valideur, approuvee, motif=""):
         objet=demande,
     )
 
-    return demande
+    _informer_observateurs(
+        demande,
+        "Congé validé" if approuvee else "Congé refusé",
+        "INFO" if approuvee else "WARNING",
+    )
+
+    demande_appelant.refresh_from_db()
+    return demande_appelant
 
 
 def annuler(demande, utilisateur, motif=""):

@@ -159,9 +159,20 @@ class ValidationTests(BaseWorkflow, TestCase):
         """
         self.assertFalse(workflow.peut_valider(self.demande, self.autre_chef))
 
-    def test_direction_et_rh_valident_toujours(self):
+    def test_direction_peut_valider_directement(self):
+        """
+        La direction porte l'autorité du circuit : elle peut trancher sans
+        attendre le responsable hiérarchique.
+        """
         self.assertTrue(workflow.peut_valider(self.demande, self.directeur))
-        self.assertTrue(workflow.peut_valider(self.demande, self.rh))
+
+    def test_rh_n_est_plus_valideur_d_un_salarie_encadre(self):
+        """
+        Nouveau circuit : responsable puis direction. Les RH sont
+        observateurs, pas décideurs — sauf en repli, quand le salarié n'a
+        aucun responsable désigné.
+        """
+        self.assertFalse(workflow.peut_valider(self.demande, self.rh))
 
     def test_nul_ne_valide_sa_propre_demande(self):
         services.crediter_acquisitions(self.chef, date(2027, 8, 1))
@@ -169,13 +180,45 @@ class ValidationTests(BaseWorkflow, TestCase):
             self.chef, TypeConge.ANNUEL, date(2027, 8, 2), date(2027, 8, 6))
         self.assertFalse(workflow.peut_valider(sienne, self.chef))
 
-    def test_validation_debite_le_solde(self):
+    def test_le_responsable_seul_ne_cloture_pas(self):
+        """
+        Le circuit demande l'accord du responsable PUIS de la direction :
+        une seule signature ne suffit pas, et le solde n'est pas encore
+        débité.
+        """
         avant = services.solde(self.salarie, 2027)
 
         workflow.decider(self.demande, self.chef, approuvee=True)
 
-        self.assertEqual(services.solde(self.salarie, 2027), avant - 5)
+        self.assertEqual(self.demande.statut, DemandeConge.Statut.EN_ATTENTE)
+        self.assertEqual(services.solde(self.salarie, 2027), avant)
+
+    def test_validation_complete_debite_le_solde(self):
+        avant = services.solde(self.salarie, 2027)
+
+        workflow.decider(self.demande, self.chef, approuvee=True)
+        workflow.decider(self.demande, self.directeur, approuvee=True)
+
         self.assertEqual(self.demande.statut, DemandeConge.Statut.VALIDEE)
+        self.assertEqual(services.solde(self.salarie, 2027), avant - 5)
+
+    def test_validation_directe_de_la_direction(self):
+        """
+        La direction conclut seule ; les étapes sautées sont consignées.
+        """
+        from applications.validation.models import DecisionValidation
+
+        avant = services.solde(self.salarie, 2027)
+
+        workflow.decider(self.demande, self.directeur, approuvee=True)
+
+        self.assertEqual(self.demande.statut, DemandeConge.Statut.VALIDEE)
+        self.assertEqual(services.solde(self.salarie, 2027), avant - 5)
+
+        decision = DecisionValidation.objects.get(
+            objet_type="DemandeConge", objet_id=self.demande.pk)
+        self.assertTrue(decision.validation_directe)
+        self.assertEqual(decision.etapes_sautees, ["responsable"])
 
     def test_refus_ne_debite_pas(self):
         avant = services.solde(self.salarie, 2027)
@@ -188,6 +231,8 @@ class ValidationTests(BaseWorkflow, TestCase):
 
     def test_demande_deja_traitee(self):
         workflow.decider(self.demande, self.chef, approuvee=True)
+        workflow.decider(self.demande, self.directeur, approuvee=True)
+
         with self.assertRaises(DemandeRefusee):
             workflow.decider(self.demande, self.directeur, approuvee=False)
 
@@ -195,11 +240,29 @@ class ValidationTests(BaseWorkflow, TestCase):
         with self.assertRaises(DemandeRefusee):
             workflow.decider(self.demande, self.autre_chef, approuvee=True)
 
-    def test_le_salarie_est_notifie(self):
+    def test_le_salarie_est_notifie_a_la_cloture(self):
+        """Le salarié est prévenu quand la décision est définitive."""
         workflow.decider(self.demande, self.chef, approuvee=True)
+        self.assertFalse(
+            Notification.objects.filter(
+                utilisateur=self.salarie, titre="Congé validé").exists())
+
+        workflow.decider(self.demande, self.directeur, approuvee=True)
         self.assertTrue(
             Notification.objects.filter(
                 utilisateur=self.salarie, titre="Congé validé").exists())
+
+    def test_observateurs_informes(self):
+        """RH et comptabilité reçoivent l'information complète."""
+        workflow.decider(self.demande, self.chef, approuvee=True)
+        workflow.decider(self.demande, self.directeur, approuvee=True)
+
+        avis = Notification.objects.filter(
+            utilisateur=self.rh, titre="Congé validé").first()
+
+        self.assertIsNotNone(avis)
+        self.assertIn(self.salarie.nom_complet, avis.message)
+        self.assertIn("5 j", avis.message)
 
 
 class AnnulationTests(BaseWorkflow, TestCase):
@@ -295,14 +358,20 @@ class CongeAPITests(BaseWorkflow, APITestCase):
 
     def test_decider_par_l_api(self):
         demande = self.deposer()
-        self.client.force_authenticate(self.chef)
 
-        reponse = self.client.post(
+        self.client.force_authenticate(self.chef)
+        r1 = self.client.post(
             f"/api/conges/{demande.pk}/decider/",
             {"approuvee": True}, format="json")
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.data["statut"], DemandeConge.Statut.EN_ATTENTE)
 
-        self.assertEqual(reponse.status_code, 200)
-        self.assertEqual(reponse.data["statut"], DemandeConge.Statut.VALIDEE)
+        self.client.force_authenticate(self.directeur)
+        r2 = self.client.post(
+            f"/api/conges/{demande.pk}/decider/",
+            {"approuvee": True}, format="json")
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.data["statut"], DemandeConge.Statut.VALIDEE)
 
     def test_mon_solde(self):
         self.client.force_authenticate(self.salarie)

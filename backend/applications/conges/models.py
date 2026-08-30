@@ -165,6 +165,12 @@ class DemandeConge(models.Model):
         default=Statut.EN_ATTENTE
     )
 
+    etape_validation = models.PositiveSmallIntegerField(
+        verbose_name="Étape de validation courante",
+        default=0,
+        help_text="Rang dans le circuit applicable (voir circuits.py)."
+    )
+
     valideur = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="Validé / refusé par",
