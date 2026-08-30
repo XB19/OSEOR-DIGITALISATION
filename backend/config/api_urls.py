@@ -21,6 +21,7 @@ from applications.tableau_bord.rapports import RapportAdministratifView, Rapport
 from applications.documents.api import DocumentViewSet
 from applications.stocks.api import ArticleViewSet, MouvementStockViewSet
 from applications.contrats.api import ContratViewSet
+from applications.caisse.api import BonSortieViewSet, CaisseViewSet
 from applications.conges.api import DemandeCongeViewSet, JourFerieViewSet
 from applications.evenements.api import EvenementViewSet
 from applications.galerie.api import AlbumViewSet, PhotoViewSet
@@ -48,6 +49,8 @@ router.register("contrats", ContratViewSet, basename="contrat")
 router.register("evenements", EvenementViewSet, basename="evenement")
 router.register("conges", DemandeCongeViewSet, basename="conge")
 router.register("jours-feries", JourFerieViewSet, basename="jour-ferie")
+router.register("caisses", CaisseViewSet, basename="caisse")
+router.register("bons-sortie", BonSortieViewSet, basename="bon-sortie")
 router.register("albums", AlbumViewSet, basename="album")
 router.register("photos", PhotoViewSet, basename="photo")
 router.register("prestations", PrestationViewSet, basename="prestation")

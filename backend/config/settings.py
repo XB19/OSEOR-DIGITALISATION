@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
 
     'applications.aide',
+    'applications.caisse',
     'applications.validation',
     'applications.conges',
     'applications.evenements',
@@ -231,6 +232,17 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # (art. 200 a 202) n'impose qu'un report de deux ans d'accord-parties :
 # mettre 2 ici pour s'aligner sur le minimum legal, et replanifier la
 # tache conges.expirer_soldes.
+# =====================================================================
+# Caisse
+# =====================================================================
+
+# Au-dela de ce montant, une sortie de caisse releve de la direction ; en
+# deca, un chef de service suffit. Evite que le demandeur ne choisisse
+# l'approbateur le plus accommodant.
+CAISSE_SEUIL_DIRECTION = config(
+    "CAISSE_SEUIL_DIRECTION", default="100000")
+
+
 CONGES_REPORT_MAX_ANNEES = config(
     "CONGES_REPORT_MAX_ANNEES", default=None,
     cast=lambda v: None if v in ("", "None", None) else int(v),
