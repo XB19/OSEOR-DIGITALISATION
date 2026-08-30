@@ -23,6 +23,7 @@ from applications.stocks.api import ArticleViewSet, MouvementStockViewSet
 from applications.contrats.api import ContratViewSet
 from applications.caisse.api import BonSortieViewSet, CaisseViewSet
 from applications.conges.api import DemandeCongeViewSet, JourFerieViewSet
+from applications.discipline.api import ProcedureDisciplinaireViewSet
 from applications.evenements.api import EvenementViewSet
 from applications.galerie.api import AlbumViewSet, PhotoViewSet
 from applications.prestations.api import (
@@ -50,6 +51,8 @@ router.register("evenements", EvenementViewSet, basename="evenement")
 router.register("conges", DemandeCongeViewSet, basename="conge")
 router.register("jours-feries", JourFerieViewSet, basename="jour-ferie")
 router.register("caisses", CaisseViewSet, basename="caisse")
+router.register("procedures-disciplinaires",
+                ProcedureDisciplinaireViewSet, basename="discipline")
 router.register("bons-sortie", BonSortieViewSet, basename="bon-sortie")
 router.register("albums", AlbumViewSet, basename="album")
 router.register("photos", PhotoViewSet, basename="photo")

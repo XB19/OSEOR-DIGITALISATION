@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 
     'applications.aide',
     'applications.caisse',
+    'applications.discipline',
     'applications.validation',
     'applications.conges',
     'applications.evenements',
