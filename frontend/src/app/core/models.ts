@@ -416,16 +416,23 @@ export interface ReponseAideChat {
 }
 
 // ---------- Visiteurs (accueil) ----------
+export type StatutVisite = 'EN_ATTENTE' | 'VALIDEE' | 'REFUSEE' | 'TERMINEE';
+
 export interface Visite {
   id: number;
   nom: string;
   prenom: string;
   numero_piece: string;
+  motif: string;
   filiale: number;
   filiale_nom: string;
   enregistre_par: number;
   enregistre_par_nom: string;
+  traite_par: number | null;
+  traite_par_nom: string | null;
+  statut: StatutVisite;
+  statut_libelle: string;
+  motif_refus: string;
   heure_arrivee: string;
   heure_depart: string | null;
-  presente: boolean;
 }

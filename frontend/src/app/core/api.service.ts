@@ -324,8 +324,14 @@ export class ApiService {
   visites(filtres: Record<string, any> = {}): Observable<Paginated<Visite>> {
     return this.http.get<Paginated<Visite>>(`${this.api}/visites/`, { params: this.params(filtres) });
   }
-  creerVisite(v: { nom: string; prenom: string; numero_piece: string }): Observable<Visite> {
+  creerVisite(v: { nom: string; prenom: string; numero_piece: string; motif: string }): Observable<Visite> {
     return this.http.post<Visite>(`${this.api}/visites/`, v);
+  }
+  validerVisite(id: number): Observable<Visite> {
+    return this.http.post<Visite>(`${this.api}/visites/${id}/valider/`, {});
+  }
+  refuserVisite(id: number, motif: string): Observable<Visite> {
+    return this.http.post<Visite>(`${this.api}/visites/${id}/refuser/`, { motif });
   }
   marquerDepartVisite(id: number): Observable<Visite> {
     return this.http.post<Visite>(`${this.api}/visites/${id}/marquer_depart/`, {});
