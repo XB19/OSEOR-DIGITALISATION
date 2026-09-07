@@ -25,21 +25,25 @@ import { NotificationItem } from '../core/models';
         <div class="logo-txt">SMART<small>HUB</small></div>
       </div>
       <nav>
-        <div class="nav-titre">Réservations &amp; audiences</div>
-        <a routerLink="/tableau-de-bord" routerLinkActive="actif"><app-icon name="dashboard"/> Tableau de bord</a>
-        <a routerLink="/calendrier" routerLinkActive="actif"><app-icon name="calendar"/> Calendrier des salles</a>
-        <a routerLink="/reserver" routerLinkActive="actif"><app-icon name="plus"/> Nouvelle réservation</a>
-        <a routerLink="/recurrence" routerLinkActive="actif"><app-icon name="repeat"/> Réservation récurrente</a>
-        <a routerLink="/mes-reservations" routerLinkActive="actif"><app-icon name="list"/> Mes réservations</a>
-        @if (auth.aRole('SECRETAIRE','ADMINISTRATEUR')) {
-          <a routerLink="/validation" routerLinkActive="actif"><app-icon name="checkCircle"/> Validation</a>
-          <a routerLink="/salles" routerLinkActive="actif"><app-icon name="building"/> Salles</a>
+        @if (!auth.aRole('AGENT_SECURITE')) {
+          <div class="nav-titre">Réservations &amp; audiences</div>
+          <a routerLink="/tableau-de-bord" routerLinkActive="actif"><app-icon name="dashboard"/> Tableau de bord</a>
+          <a routerLink="/calendrier" routerLinkActive="actif"><app-icon name="calendar"/> Calendrier des salles</a>
+          <a routerLink="/reserver" routerLinkActive="actif"><app-icon name="plus"/> Nouvelle réservation</a>
+          <a routerLink="/recurrence" routerLinkActive="actif"><app-icon name="repeat"/> Réservation récurrente</a>
+          <a routerLink="/mes-reservations" routerLinkActive="actif"><app-icon name="list"/> Mes réservations</a>
+          @if (auth.aRole('SECRETAIRE','ADMINISTRATEUR')) {
+            <a routerLink="/validation" routerLinkActive="actif"><app-icon name="checkCircle"/> Validation</a>
+            <a routerLink="/salles" routerLinkActive="actif"><app-icon name="building"/> Salles</a>
+          }
+          <a routerLink="/audiences" routerLinkActive="actif"><app-icon name="users"/> Audiences</a>
         }
-        <a routerLink="/audiences" routerLinkActive="actif"><app-icon name="users"/> Audiences</a>
 
-        <div class="nav-titre">Vie interne</div>
-        @for (m of modulesVieInterne(); track m.lien) {
-          <a [routerLink]="m.lien" routerLinkActive="actif"><app-icon [name]="m.icone"/> {{ m.libelle }}</a>
+        @if (modulesVieInterne().length) {
+          <div class="nav-titre">Vie interne</div>
+          @for (m of modulesVieInterne(); track m.lien) {
+            <a [routerLink]="m.lien" routerLinkActive="actif"><app-icon [name]="m.icone"/> {{ m.libelle }}</a>
+          }
         }
 
         @if (modulesVisibles().length) {
@@ -211,8 +215,19 @@ export class ShellComponent implements OnInit {
 
   ngOnInit(): void { this.notifs.demarrer(); }
 
+  /**
+   * Un module sans `roles` est ouvert à tout le monde... sauf à l'agent de
+   * sécurité : ce compte n'a qu'un seul usage (l'accueil des visiteurs), il
+   * ne doit jamais hériter des modules « ouverts à tous » pensés pour les
+   * employés du groupe.
+   */
+  private estVisiblePour(m: ModuleMetier): boolean {
+    if (!m.roles) return !this.auth.aRole('AGENT_SECURITE');
+    return this.auth.aRole(...m.roles);
+  }
+
   modulesVisibles(): ModuleMetier[] {
-    return MODULES_MOYENS_GENERAUX.filter((m) => !m.roles || this.auth.aRole(...m.roles));
+    return MODULES_MOYENS_GENERAUX.filter((m) => this.estVisiblePour(m));
   }
 
   /**
@@ -221,7 +236,7 @@ export class ShellComponent implements OnInit {
    * un salarié n'atteignant son propre dossier que par sa notification.
    */
   modulesVieInterne(): ModuleMetier[] {
-    return MODULES_VIE_INTERNE.filter((m) => !m.roles || this.auth.aRole(...m.roles));
+    return MODULES_VIE_INTERNE.filter((m) => this.estVisiblePour(m));
   }
 
   /** Marque la notification lue puis navigue vers l'élément concerné, s'il y en a un. */

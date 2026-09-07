@@ -102,8 +102,8 @@ export class LoginComponent {
     this.auth.connexion(this.username, this.password).subscribe({
       next: () => {
         this.auth.chargerProfil().subscribe({
-          next: () => { this.chargement.set(false); this.router.navigate(['/tableau-de-bord']); },
-          error: () => { this.chargement.set(false); this.router.navigate(['/tableau-de-bord']); },
+          next: () => { this.chargement.set(false); this.router.navigate([this.auth.pageAccueil()]); },
+          error: () => { this.chargement.set(false); this.router.navigate([this.auth.pageAccueil()]); },
         });
       },
       error: () => {

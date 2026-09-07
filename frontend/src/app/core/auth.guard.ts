@@ -19,7 +19,7 @@ export const roleGuard = (...roles: string[]): CanActivateFn => {
     if (auth.aRole(...roles)) {
       return true;
     }
-    router.navigate(['/tableau-de-bord']);
+    router.navigate([auth.pageAccueil()]);
     return false;
   };
 };

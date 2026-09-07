@@ -61,4 +61,13 @@ export class AuthService {
     const r = this.role();
     return r !== null && roles.includes(r);
   }
+
+  /**
+   * Page d'atterrissage après connexion (ou après un refus d'accès à une
+   * route protégée). L'agent de sécurité n'a qu'un seul écran utile — le
+   * reste de l'app (tableau de bord, réservations...) ne le concerne pas.
+   */
+  pageAccueil(): string {
+    return this.aRole('AGENT_SECURITE') ? '/visiteurs' : '/tableau-de-bord';
+  }
 }
