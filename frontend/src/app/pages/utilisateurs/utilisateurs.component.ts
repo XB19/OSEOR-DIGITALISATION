@@ -112,6 +112,7 @@ interface ResultatSync {
             <option value="CHEF_SERVICE">Chef de service</option>
             <option value="COMPTABLE">Comptable</option>
             <option value="RH">RH</option>
+            <option value="AGENT_SECURITE">Agent de sécurité</option>
             <option value="ADMINISTRATEUR">Administrateur</option>
           </select>
         </div>
@@ -153,6 +154,7 @@ interface ResultatSync {
         <option value="EMPLOYE">Employés</option>
         <option value="SECRETAIRE">Secrétaires</option>
         <option value="DIRECTEUR">Directeurs</option>
+        <option value="AGENT_SECURITE">Agents de sécurité</option>
         <option value="ADMINISTRATEUR">Administrateurs</option>
       </select>
     </div>
