@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from applications.notifications.services import envoyer_notification
-from .models import Document
+from config.permissions import est_direction, restreindre_a_la_filiale
+from .models import ConfigurationDocument, Document
 
 User = get_user_model()
 
@@ -124,3 +125,42 @@ def rappeler_documents_en_attente(seuil_jours=3):
         relances += 1
 
     return relances
+
+
+def compter_a_viser_par_type(utilisateur) -> dict:
+    """
+    Documents EN_COURS où c'est actuellement au tour de `utilisateur` de
+    viser, groupés par type de document (pour le tableau de bord).
+
+    Même règle que `DocumentSerializer.get_peut_viser` (documents/serializers.py) :
+    si l'un des deux change, l'autre doit suivre. La différence est de
+    performance — le serializer relit `ConfigurationDocument` une fois par
+    document (`Document.configuration()`), ce qui est acceptable pour une
+    poignée de documents affichés mais coûterait une requête par document
+    ici ; on précharge donc les configurations en une seule requête groupée.
+    """
+    documents = restreindre_a_la_filiale(
+        Document.objects.filter(statut=Document.Statut.EN_COURS), utilisateur
+    ).only("id", "filiale_id", "type_document", "etape_visa_courante")
+
+    filiale_ids = {d.filiale_id for d in documents}
+    if not filiale_ids:
+        return {}
+
+    configs = {
+        (c.filiale_id, c.type_document): c.visas
+        for c in ConfigurationDocument.objects.filter(filiale_id__in=filiale_ids)
+    }
+
+    direction = est_direction(utilisateur)
+    compteurs: dict = {}
+    for document in documents:
+        visas = configs.get((document.filiale_id, document.type_document))
+        if not visas or document.etape_visa_courante >= len(visas):
+            continue
+        etape = visas[document.etape_visa_courante]
+        peut_viser = direction or (etape.get("role") and utilisateur.role == etape["role"])
+        if peut_viser:
+            cle = document.type_document
+            compteurs[cle] = compteurs.get(cle, 0) + 1
+    return compteurs

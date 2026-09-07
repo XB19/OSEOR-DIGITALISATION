@@ -280,6 +280,9 @@ export class ShellComponent implements OnInit {
         // menu est réservée à ceux qui instruisent.
         this.router.navigate(['/discipline'], { queryParams: { id: n.objet_id } });
         break;
+      case 'Visite':
+        this.router.navigate(['/visiteurs'], { queryParams: { id: n.objet_id } });
+        break;
     }
   }
 

@@ -10,8 +10,33 @@ from applications.filiales.models import Filiale
 from applications.salles.models import Salle
 from applications.reservations.models import Reservation
 from applications.audiences.models import Audience
+from applications.visiteurs.models import Visite
+from applications.contrats.models import Contrat
+from applications.stocks.models import Article
+from applications.caisse.models import BonSortie
+from applications.notes.models import LectureNote
+from applications.discipline.models import ProcedureDisciplinaire
+from applications.discipline.services import procedures_visibles
+from applications.conges.models import DemandeConge
+from applications.conges.workflow import peut_valider as conges_peut_valider
+from applications.documents.models import TypeDocument
+from applications.documents.services import compter_a_viser_par_type
+from config.permissions import RH, est_direction, restreindre_a_la_filiale
 
 R = Reservation.Statut
+
+# Type de document -> (route Angular, icône) — même correspondance que
+# `CHEMIN_PAR_TYPE_DOCUMENT` côté frontend (core/modules-metier.ts), les
+# deux copies devant évoluer ensemble si un type de document est ajouté.
+_ROUTE_PAR_TYPE_DOCUMENT = {
+    TypeDocument.FICHE_BESOIN: ("/fiche-besoin", "send"),
+    TypeDocument.DEMANDE_ACHAT: ("/demandes-achat", "cart"),
+    TypeDocument.FICHE_TRANSPORT: ("/deplacements", "car"),
+    TypeDocument.BON_SORTIE_CAISSE: ("/bon-sortie-caisse", "wallet"),
+    TypeDocument.BON_COMMANDE: ("/bons-commande", "cart"),
+    TypeDocument.NOTE_INTERNE: ("/notes-internes", "edit"),
+    TypeDocument.FACTURE: ("/factures", "receipt"),
+}
 
 
 class StatistiquesView(APIView):
@@ -73,7 +98,118 @@ class StatistiquesView(APIView):
             "taux_occupation_7j": self._taux_occupation(salles, aujourd_hui),
             "salles_plus_demandees": self._salles_top(reservations),
         })
+        data["mes_actions"] = self._mes_actions(u, rstats["attente"])
         return Response(data)
+
+    def _mes_actions(self, u, reservations_en_attente):
+        """
+        Ce que CET utilisateur a personnellement à valider ou consulter,
+        tous modules confondus — pas seulement les réservations de salles.
+        Une entrée par élément avec un compteur > 0 ; rien à afficher = rien
+        de renvoyé (le front affiche alors un état vide).
+        """
+        actions = []
+
+        if u.role in ("SECRETAIRE", "ADMINISTRATEUR") and reservations_en_attente:
+            actions.append({
+                "cle": "reservations", "libelle": "Réservations à valider",
+                "count": reservations_en_attente, "lien": "/validation", "icone": "checkCircle",
+            })
+
+        if u.role in ("SECRETAIRE", "ADMINISTRATEUR", "DIRECTEUR"):
+            n = restreindre_a_la_filiale(
+                Visite.objects.filter(statut=Visite.Statut.EN_ATTENTE), u
+            ).count()
+            if n:
+                actions.append({
+                    "cle": "visites", "libelle": "Visiteurs à valider",
+                    "count": n, "lien": "/visiteurs", "icone": "idCard",
+                })
+
+        # Congés : même périmètre que conges/api.py::get_queryset (RH et
+        # direction voient tout, les autres leurs subordonnés + eux-mêmes),
+        # puis on ne garde que les demandes où c'est réellement à cet
+        # utilisateur de trancher (conges.workflow.peut_valider).
+        if est_direction(u) or u.role == RH:
+            demandes = DemandeConge.objects.filter(statut=DemandeConge.Statut.EN_ATTENTE)
+        else:
+            subordonnes = u.subordonnes.values_list("pk", flat=True)
+            demandes = DemandeConge.objects.filter(
+                statut=DemandeConge.Statut.EN_ATTENTE, utilisateur__in=[u.pk, *subordonnes],
+            )
+        n = sum(1 for d in demandes if conges_peut_valider(d, u))
+        if n:
+            actions.append({
+                "cle": "conges", "libelle": "Congés à valider",
+                "count": n, "lien": "/conges", "icone": "sun",
+            })
+
+        if u.role in ("CHEF_SERVICE", "DIRECTEUR", "ADMINISTRATEUR"):
+            contrats = Contrat.objects.exclude(statut=Contrat.Statut.RESILIE).filter(date_echeance__isnull=False)
+            if u.role not in ("ADMINISTRATEUR", "DIRECTEUR"):
+                contrats = contrats.filter(filiale=u.filiale)
+            n = sum(1 for c in contrats if c.jours_avant_echeance is not None and c.jours_avant_echeance <= 30)
+            if n:
+                actions.append({
+                    "cle": "contrats", "libelle": "Contrats proches de l'échéance",
+                    "count": n, "lien": "/contrats", "icone": "briefcase",
+                })
+
+            articles = Article.objects.filter(actif=True)
+            if u.role not in ("ADMINISTRATEUR", "DIRECTEUR"):
+                articles = articles.filter(filiale=u.filiale)
+            n = sum(1 for a in articles if a.en_alerte)
+            if n:
+                actions.append({
+                    "cle": "stocks", "libelle": "Articles en alerte de stock",
+                    "count": n, "lien": "/stocks", "icone": "archive",
+                })
+
+        # Bons de sortie de caisse : même filtre que caisse/api.py::a_autoriser.
+        bons = BonSortie.objects.filter(statut=BonSortie.Statut.EN_ATTENTE).exclude(demandeur=u)
+        if not est_direction(u):
+            bons = bons.filter(destinataire=u)
+        n = bons.count()
+        if n:
+            actions.append({
+                "cle": "bons_sortie", "libelle": "Bons de sortie à autoriser",
+                "count": n, "lien": "/bon-sortie-caisse", "icone": "wallet",
+            })
+
+        n = LectureNote.objects.filter(destinataire=u, date_lecture__isnull=True).count()
+        if n:
+            actions.append({
+                "cle": "notes", "libelle": "Notes non lues",
+                "count": n, "lien": "/notes-recues", "icone": "doc",
+            })
+
+        if est_direction(u) or u.role == RH:
+            n = procedures_visibles(u).filter(
+                statut__in=[
+                    ProcedureDisciplinaire.Statut.OUVERTE,
+                    ProcedureDisciplinaire.Statut.EXPLICATIONS_FOURNIES,
+                ]
+            ).count()
+            if n:
+                actions.append({
+                    "cle": "discipline", "libelle": "Procédures disciplinaires en cours",
+                    "count": n, "lien": "/discipline", "icone": "shield",
+                })
+
+        # Documents à viser : une entrée par type de document (Fiche de
+        # besoin, Demande d'achat…), chacune vers sa propre page.
+        for type_document, n in compter_a_viser_par_type(u).items():
+            route_icone = _ROUTE_PAR_TYPE_DOCUMENT.get(type_document)
+            if not route_icone or not n:
+                continue
+            lien, icone = route_icone
+            actions.append({
+                "cle": f"documents_{type_document.lower()}",
+                "libelle": f"{TypeDocument(type_document).label} à viser",
+                "count": n, "lien": lien, "icone": icone,
+            })
+
+        return actions
 
     def _taux_occupation(self, salles, debut):
         """

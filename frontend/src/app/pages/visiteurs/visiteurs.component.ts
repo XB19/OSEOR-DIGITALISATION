@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { DialogueService } from '../../core/dialogue.service';
@@ -19,36 +20,38 @@ import { Visite } from '../../core/models';
     </div>
   </div>
 
-  <div class="carte anim-entree">
-    <h3>Enregistrer une arrivée</h3>
-    <p class="aide">La pièce d'identité du visiteur est conservée à l'accueil jusqu'à son départ. La demande part au secrétariat pour validation.</p>
-    <form (ngSubmit)="enregistrerArrivee()">
-      <div class="ligne">
-        <div class="champ">
-          <label>Nom</label>
-          <input type="text" [(ngModel)]="form.nom" name="nom" required autocomplete="off" />
+  @if (peutEnregistrer()) {
+    <div class="carte anim-entree">
+      <h3>Enregistrer une arrivée</h3>
+      <p class="aide">La pièce d'identité du visiteur est conservée à l'accueil jusqu'à son départ. La demande part au secrétariat pour validation.</p>
+      <form (ngSubmit)="enregistrerArrivee()">
+        <div class="ligne">
+          <div class="champ">
+            <label>Nom</label>
+            <input type="text" [(ngModel)]="form.nom" name="nom" required autocomplete="off" />
+          </div>
+          <div class="champ">
+            <label>Prénom</label>
+            <input type="text" [(ngModel)]="form.prenom" name="prenom" required autocomplete="off" />
+          </div>
+          <div class="champ">
+            <label>Numéro de pièce d'identité</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*"
+                   [ngModel]="form.numero_piece" (ngModelChange)="fixerNumeroPiece($event)"
+                   name="numero_piece" placeholder="Chiffres uniquement" required autocomplete="off" />
+          </div>
         </div>
         <div class="champ">
-          <label>Prénom</label>
-          <input type="text" [(ngModel)]="form.prenom" name="prenom" required autocomplete="off" />
+          <label>Motif de la visite</label>
+          <input type="text" [(ngModel)]="form.motif" name="motif" placeholder="Ex. rendez-vous, livraison, entretien…" required autocomplete="off" />
         </div>
-        <div class="champ">
-          <label>Numéro de pièce d'identité</label>
-          <input type="text" inputmode="numeric" pattern="[0-9]*"
-                 [ngModel]="form.numero_piece" (ngModelChange)="fixerNumeroPiece($event)"
-                 name="numero_piece" placeholder="Chiffres uniquement" required autocomplete="off" />
-        </div>
-      </div>
-      <div class="champ">
-        <label>Motif de la visite</label>
-        <input type="text" [(ngModel)]="form.motif" name="motif" placeholder="Ex. rendez-vous, livraison, entretien…" required autocomplete="off" />
-      </div>
-      <button type="submit" class="btn cta" [disabled]="enregistrementEnCours() || !formValide()">
-        @if (enregistrementEnCours()) { <span class="spinner petit"></span> Enregistrement… }
-        @else { <app-icon name="plus"/> Enregistrer l'arrivée }
-      </button>
-    </form>
-  </div>
+        <button type="submit" class="btn cta" [disabled]="enregistrementEnCours() || !formValide()">
+          @if (enregistrementEnCours()) { <span class="spinner petit"></span> Enregistrement… }
+          @else { <app-icon name="plus"/> Enregistrer l'arrivée }
+        </button>
+      </form>
+    </div>
+  }
 
   <div class="carte anim-entree espace">
     <h3>Demandes en attente de validation ({{ enAttente().length }})</h3>
@@ -64,7 +67,7 @@ import { Visite } from '../../core/models';
         </thead>
         <tbody class="stagger">
           @for (v of enAttente(); track v.id) {
-            <tr>
+            <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.numero_piece }}</td>
@@ -100,7 +103,7 @@ import { Visite } from '../../core/models';
         </thead>
         <tbody class="stagger">
           @for (v of presents(); track v.id) {
-            <tr>
+            <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.numero_piece }}</td>
@@ -130,7 +133,7 @@ import { Visite } from '../../core/models';
         </thead>
         <tbody class="stagger">
           @for (v of historique(); track v.id) {
-            <tr>
+            <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.heure_arrivee | date:'dd/MM/yyyy HH:mm' }}</td>
@@ -157,6 +160,8 @@ import { Visite } from '../../core/models';
     .espace { margin-top: 1.2rem; }
     .actions { display: flex; gap: .4rem; flex-wrap: wrap; }
     .motif-refus { font-size: .76rem; color: var(--txt-3); margin-top: .2rem; }
+    tr.surlignee { background: #fff7e6 !important; box-shadow: inset 3px 0 0 var(--accent); animation: pulseSurlignee 1.6s ease-out 1; }
+    @keyframes pulseSurlignee { 0% { background: #ffedc2 !important; } 100% { background: #fff7e6 !important; } }
   `],
 })
 export class VisiteursComponent implements OnInit {
@@ -164,11 +169,12 @@ export class VisiteursComponent implements OnInit {
   chargement = signal(false);
   enregistrementEnCours = signal(false);
   actionEnCours = signal<number | null>(null);
+  ligneSurlignee = signal<number | null>(null);
 
   form = { nom: '', prenom: '', numero_piece: '', motif: '' };
 
   constructor(
-    private api: ApiService, public auth: AuthService,
+    private api: ApiService, public auth: AuthService, private route: ActivatedRoute,
     private dialogue: DialogueService, private toasts: ToastService,
   ) {}
 
@@ -176,8 +182,21 @@ export class VisiteursComponent implements OnInit {
     this.charger();
   }
 
+  /** Ouverture directe depuis une notification (?id=...) : surligne et scroll vers la ligne concernée. */
+  private ouvrirDepuisNotif(): void {
+    const id = Number(this.route.snapshot.queryParamMap.get('id'));
+    if (!id || !this.visites().some((v) => v.id === id)) return;
+    this.ligneSurlignee.set(id);
+    setTimeout(() => document.getElementById('visite-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+  }
+
   peutTraiter(): boolean {
     return this.auth.aRole('SECRETAIRE', 'ADMINISTRATEUR', 'DIRECTEUR');
+  }
+
+  /** La secrétaire ne fait que valider/refuser : le formulaire d'arrivée ne la concerne pas. */
+  peutEnregistrer(): boolean {
+    return !this.auth.aRole('SECRETAIRE');
   }
 
   formValide(): boolean {
@@ -208,7 +227,7 @@ export class VisiteursComponent implements OnInit {
   charger(): void {
     this.chargement.set(true);
     this.api.visites({ page_size: 100 }).subscribe({
-      next: (p) => { this.chargement.set(false); this.visites.set(p.results); },
+      next: (p) => { this.chargement.set(false); this.visites.set(p.results); this.ouvrirDepuisNotif(); },
       error: (e) => { this.chargement.set(false); this.erreurToast('Chargement impossible', e); },
     });
   }

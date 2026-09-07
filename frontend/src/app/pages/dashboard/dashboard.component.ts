@@ -68,15 +68,19 @@ import { GalerieDefilanteComponent } from '../../shared/galerie-defilante.compon
       </div>
 
       <div class="carte anim-entree">
-        <h3>Accès rapides</h3>
-        <div class="actions">
-          <a class="action" routerLink="/calendrier"><app-icon name="calendar"/> Voir le calendrier</a>
-          <a class="action" routerLink="/recurrence"><app-icon name="repeat"/> Réservation récurrente</a>
-          @if (auth.aRole('SECRETAIRE','ADMINISTRATEUR')) {
-            <a class="action" routerLink="/validation"><app-icon name="checkCircle"/> Demandes à valider</a>
-          }
-          <a class="action" routerLink="/audiences"><app-icon name="users"/> Gérer les audiences</a>
-        </div>
+        <h3>Mes actions</h3>
+        @if (s.mes_actions?.length) {
+          <div class="actions">
+            @for (a of s.mes_actions; track a.cle) {
+              <a class="action" [routerLink]="a.lien">
+                <app-icon [name]="a.icone"/> {{ a.libelle }}
+                <span class="pastille">{{ a.count }}</span>
+              </a>
+            }
+          </div>
+        } @else {
+          <div class="vide">Rien à traiter pour le moment 🎉</div>
+        }
       </div>
     </div>
 
@@ -141,6 +145,9 @@ import { GalerieDefilanteComponent } from '../../shared/galerie-defilante.compon
       border: 1px solid var(--bord); color: var(--txt); font-weight: 500; font-size: .9rem;
       transition: background var(--t), border-color var(--t), transform var(--t); }
     .action app-icon { color: var(--bleu); }
+    .action .pastille { margin-left: auto; background: var(--accent); color: #fff; font-weight: 700;
+      font-size: .76rem; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+      display: flex; align-items: center; justify-content: center; }
     .action:hover { background: #f8fafc; border-color: var(--bleu); transform: translateX(3px); }
 
     .outils-carte { margin-top: 1rem; }
