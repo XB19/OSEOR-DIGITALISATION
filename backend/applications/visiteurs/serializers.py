@@ -4,14 +4,22 @@ from .models import Visite, _VALIDATEUR_NUMERO_PIECE
 
 
 class VisiteSerializer(serializers.ModelSerializer):
-    # Forcés `required` malgré le `default=""` en base (nécessaire côté
-    # modèle uniquement pour ne pas bloquer une future migration). Le
-    # validateur n'est pas hérité automatiquement dès qu'un champ est
-    # redéclaré explicitement : on le reprend donc ici.
+    # Forcés `required` malgré le `default=""` / `null=True` en base
+    # (nécessaire côté modèle uniquement pour ne pas bloquer une future
+    # migration). Ces attributs ne sont pas hérités automatiquement dès
+    # qu'un champ est redéclaré explicitement : on les reprend donc ici.
     numero_piece = serializers.CharField(max_length=30, validators=[_VALIDATEUR_NUMERO_PIECE])
     motif = serializers.CharField(max_length=255)
+    # OSEOR est un groupe : la filiale visitée n'est pas forcément celle de
+    # l'agent qui saisit (accueil commun à plusieurs filiales) — c'est lui
+    # qui la précise, pour chaque visiteur.
+    filiale = serializers.PrimaryKeyRelatedField(queryset=Visite._meta.get_field("filiale").related_model.objects.all())
+    personne_visitee = serializers.PrimaryKeyRelatedField(
+        queryset=Visite._meta.get_field("personne_visitee").related_model.objects.all()
+    )
 
     filiale_nom = serializers.CharField(source="filiale.nom", read_only=True)
+    personne_visitee_nom = serializers.CharField(source="personne_visitee.nom_complet", read_only=True)
     enregistre_par_nom = serializers.CharField(source="enregistre_par.nom_complet", read_only=True)
     traite_par_nom = serializers.CharField(source="traite_par.nom_complet", read_only=True, default=None)
     statut_libelle = serializers.CharField(source="get_statut_display", read_only=True)
@@ -26,6 +34,8 @@ class VisiteSerializer(serializers.ModelSerializer):
             "motif",
             "filiale",
             "filiale_nom",
+            "personne_visitee",
+            "personne_visitee_nom",
             "enregistre_par",
             "enregistre_par_nom",
             "traite_par",
@@ -37,31 +47,31 @@ class VisiteSerializer(serializers.ModelSerializer):
             "heure_depart",
         )
         read_only_fields = (
-            "filiale", "enregistre_par", "traite_par",
+            "enregistre_par", "traite_par",
             "statut", "motif_refus", "heure_arrivee", "heure_depart",
         )
 
     def validate(self, attrs):
-        request = self.context.get("request")
-        utilisateur = request.user if request else None
-        if utilisateur and not utilisateur.filiale_id:
+        personne = attrs.get("personne_visitee")
+        filiale = attrs.get("filiale")
+        if personne and filiale and personne.filiale_id != filiale.id:
             raise serializers.ValidationError(
-                "Votre compte n'est rattaché à aucune filiale : impossible d'enregistrer une visite."
+                {"personne_visitee": "Cette personne n'appartient pas à la filiale sélectionnée."}
             )
         return attrs
 
     def create(self, validated_data):
         request = self.context.get("request")
         utilisateur = request.user if request else None
-        validated_data["filiale"] = utilisateur.filiale
         validated_data["enregistre_par"] = utilisateur
 
         visite = Visite.objects.create(**validated_data)
         self._notifier_secretariat(visite)
+        self._notifier_personne_visitee(visite)
         return visite
 
     def _notifier_secretariat(self, visite):
-        """Signale la nouvelle demande aux secrétaires de la filiale, même schéma que RG-02 côté réservations."""
+        """Signale la nouvelle demande aux secrétaires de la filiale visitée, même schéma que RG-02 côté réservations."""
         from django.contrib.auth import get_user_model
         from applications.notifications.services import envoyer_notification
 
@@ -71,7 +81,19 @@ class VisiteSerializer(serializers.ModelSerializer):
             envoyer_notification(
                 secretaire,
                 "Visiteur à l'accueil",
-                f"{visite.prenom} {visite.nom} — {visite.motif}",
+                f"{visite.prenom} {visite.nom} pour {visite.personne_visitee.nom_complet} — {visite.motif}",
                 "INFO",
                 objet=visite,
             )
+
+    def _notifier_personne_visitee(self, visite):
+        """La personne visitée est prévenue tout de suite, avant même la validation du secrétariat."""
+        from applications.notifications.services import envoyer_notification
+
+        envoyer_notification(
+            visite.personne_visitee,
+            "Un visiteur vous demande",
+            f"{visite.prenom} {visite.nom} — {visite.motif}. En attente de validation par le secrétariat.",
+            "INFO",
+            objet=visite,
+        )

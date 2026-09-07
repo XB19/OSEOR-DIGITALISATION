@@ -7,7 +7,7 @@ import { AuthService } from '../../core/auth.service';
 import { DialogueService } from '../../core/dialogue.service';
 import { ToastService } from '../../core/toast.service';
 import { IconComponent } from '../../shared/icon.component';
-import { Visite } from '../../core/models';
+import { Visite, Filiale, Utilisateur } from '../../core/models';
 
 @Component({
   selector: 'app-visiteurs',
@@ -45,6 +45,22 @@ import { Visite } from '../../core/models';
                    name="numero_piece" placeholder="Chiffres uniquement" required autocomplete="off" />
           </div>
         </div>
+        <div class="ligne">
+          <div class="champ">
+            <label>Filiale visitée</label>
+            <select [ngModel]="form.filiale" (ngModelChange)="choisirFiliale($event)" name="filiale" required>
+              <option [ngValue]="null">— Choisir —</option>
+              @for (f of filiales(); track f.id) { <option [ngValue]="f.id">{{ f.nom }}</option> }
+            </select>
+          </div>
+          <div class="champ">
+            <label>Personne visitée</label>
+            <select [(ngModel)]="form.personne_visitee" name="personne_visitee" required [disabled]="!form.filiale">
+              <option [ngValue]="null">{{ form.filiale ? '— Choisir —' : "D'abord choisir une filiale" }}</option>
+              @for (p of personnes(); track p.id) { <option [ngValue]="p.id">{{ p.nom_complet }}</option> }
+            </select>
+          </div>
+        </div>
         <div class="champ">
           <label>Motif de la visite</label>
           <input type="text" [(ngModel)]="form.motif" name="motif" placeholder="Ex. rendez-vous, livraison, entretien…" required autocomplete="off" />
@@ -66,13 +82,15 @@ import { Visite } from '../../core/models';
     } @else {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Motif</th><th>N° pièce</th><th>Enregistré par</th><th>Heure</th>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>N° pièce</th><th>Enregistré par</th><th>Heure</th>
             @if (peutTraiter()) { <th></th> }</tr>
         </thead>
         <tbody class="stagger">
           @for (v of enAttente(); track v.id) {
             <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
+              <td>{{ v.filiale_nom }}</td>
+              <td>{{ v.personne_visitee_nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.numero_piece }}</td>
               <td>{{ v.enregistre_par_nom }}</td>
@@ -103,12 +121,14 @@ import { Visite } from '../../core/models';
     } @else if (!chargement()) {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Motif</th><th>N° pièce</th><th>Validé par</th><th>Heure d'arrivée</th><th></th></tr>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>N° pièce</th><th>Validé par</th><th>Heure d'arrivée</th><th></th></tr>
         </thead>
         <tbody class="stagger">
           @for (v of presents(); track v.id) {
             <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
+              <td>{{ v.filiale_nom }}</td>
+              <td>{{ v.personne_visitee_nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.numero_piece }}</td>
               <td>{{ v.traite_par_nom }}</td>
@@ -133,12 +153,14 @@ import { Visite } from '../../core/models';
     } @else if (!chargement()) {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Motif</th><th>Arrivée</th><th>Départ</th><th>Statut</th></tr>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>Arrivée</th><th>Départ</th><th>Statut</th></tr>
         </thead>
         <tbody class="stagger">
           @for (v of historique(); track v.id) {
             <tr [id]="'visite-' + v.id" [class.surlignee]="ligneSurlignee() === v.id">
               <td>{{ v.prenom }} {{ v.nom }}</td>
+              <td>{{ v.filiale_nom }}</td>
+              <td>{{ v.personne_visitee_nom }}</td>
               <td>{{ v.motif }}</td>
               <td>{{ v.heure_arrivee | date:'dd/MM/yyyy HH:mm' }}</td>
               <td>{{ v.heure_depart ? (v.heure_depart | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
@@ -175,8 +197,13 @@ export class VisiteursComponent implements OnInit {
   actionEnCours = signal<number | null>(null);
   ligneSurlignee = signal<number | null>(null);
   exportEnCours = signal(false);
+  filiales = signal<Filiale[]>([]);
+  personnes = signal<Utilisateur[]>([]);
+  chargementPersonnes = signal(false);
 
-  form = { nom: '', prenom: '', numero_piece: '', motif: '' };
+  form: { nom: string; prenom: string; numero_piece: string; motif: string; filiale: number | null; personne_visitee: number | null } = {
+    nom: '', prenom: '', numero_piece: '', motif: '', filiale: null, personne_visitee: null,
+  };
 
   constructor(
     private api: ApiService, public auth: AuthService, private route: ActivatedRoute,
@@ -185,6 +212,22 @@ export class VisiteursComponent implements OnInit {
 
   ngOnInit(): void {
     this.charger();
+    if (this.peutEnregistrer()) {
+      this.api.filiales().subscribe((p) => this.filiales.set(p.results));
+    }
+  }
+
+  /** OSEOR est un groupe : la filiale visitée détermine qui peut être visité, choisie avant la personne. */
+  choisirFiliale(filialeId: number | null): void {
+    this.form.filiale = filialeId;
+    this.form.personne_visitee = null;
+    this.personnes.set([]);
+    if (!filialeId) return;
+    this.chargementPersonnes.set(true);
+    this.api.utilisateurs({ filiale: filialeId, page_size: 200 }).subscribe({
+      next: (p) => { this.chargementPersonnes.set(false); this.personnes.set(p.results); },
+      error: () => { this.chargementPersonnes.set(false); },
+    });
   }
 
   /** Ouverture directe depuis une notification (?id=...) : surligne et scroll vers la ligne concernée. */
@@ -205,7 +248,10 @@ export class VisiteursComponent implements OnInit {
   }
 
   formValide(): boolean {
-    return !!(this.form.nom.trim() && this.form.prenom.trim() && this.form.numero_piece.trim() && this.form.motif.trim());
+    return !!(
+      this.form.nom.trim() && this.form.prenom.trim() && this.form.numero_piece.trim()
+      && this.form.motif.trim() && this.form.filiale && this.form.personne_visitee
+    );
   }
 
   /** Ne garde que les chiffres saisis (numéro de pièce d'identité). */
@@ -245,11 +291,14 @@ export class VisiteursComponent implements OnInit {
       prenom: this.form.prenom.trim(),
       numero_piece: this.form.numero_piece.trim(),
       motif: this.form.motif.trim(),
+      filiale: this.form.filiale!,
+      personne_visitee: this.form.personne_visitee!,
     }).subscribe({
       next: (v) => {
         this.enregistrementEnCours.set(false);
         this.visites.update((liste) => [v, ...liste]);
-        this.form = { nom: '', prenom: '', numero_piece: '', motif: '' };
+        this.form = { nom: '', prenom: '', numero_piece: '', motif: '', filiale: null, personne_visitee: null };
+        this.personnes.set([]);
         this.toasts.succes('Demande envoyée au secrétariat pour validation.');
       },
       error: (e) => {

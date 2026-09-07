@@ -426,6 +426,8 @@ export interface Visite {
   motif: string;
   filiale: number;
   filiale_nom: string;
+  personne_visitee: number;
+  personne_visitee_nom: string;
   enregistre_par: number;
   enregistre_par_nom: string;
   traite_par: number | null;

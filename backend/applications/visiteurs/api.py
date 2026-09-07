@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from config.permissions import (
     ADMINISTRATEUR, AGENT_SECURITE, DIRECTEUR, SECRETAIRE,
-    EstUnDes, est_direction, restreindre_a_la_filiale,
+    EstUnDes, est_direction,
 )
 from applications.journalisation.services import enregistrer_action
 
@@ -34,7 +34,19 @@ class VisiteViewSet(mixins.ListModelMixin,
     ordering_fields = ("heure_arrivee",)
 
     def get_queryset(self):
-        return restreindre_a_la_filiale(Visite.objects.all(), self.request.user)
+        """
+        L'agent de sécurité tient un accueil commun à tout le groupe : il
+        voit les visites de toutes les filiales, pas seulement la sienne
+        (`restreindre_a_la_filiale` ne convient pas ici). La secrétaire, en
+        revanche, ne s'occupe que des visiteurs de sa propre filiale.
+        """
+        u = self.request.user
+        qs = Visite.objects.select_related(
+            "filiale", "personne_visitee", "enregistre_par", "traite_par"
+        )
+        if est_direction(u) or u.role == AGENT_SECURITE:
+            return qs
+        return qs.filter(filiale_id=u.filiale_id) if u.filiale_id else qs.none()
 
     def perform_create(self, serializer):
         visite = serializer.save()
@@ -117,13 +129,10 @@ class VisiteViewSet(mixins.ListModelMixin,
     # ------------------------------------------------------------------
     @action(detail=False, methods=["get"])
     def registre(self, request):
-        visites = list(
-            self.get_queryset()
-            .select_related("enregistre_par", "traite_par")
-            .order_by("-heure_arrivee")
-        )
-        filiale_nom = "Groupe (toutes filiales)" if est_direction(request.user) else (
-            request.user.filiale.nom if request.user.filiale_id else "—"
+        visites = list(self.get_queryset().order_by("-heure_arrivee"))
+        u = request.user
+        filiale_nom = "Groupe (toutes filiales)" if (est_direction(u) or u.role == AGENT_SECURITE) else (
+            u.filiale.nom if u.filiale_id else "—"
         )
         contenu = generer_pdf_registre_visiteurs(visites, filiale_nom)
 

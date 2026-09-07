@@ -72,8 +72,8 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
     ]
 
     entetes = [
-        "Visiteur", "N° pièce", "Motif", "Arrivée", "Départ",
-        "Statut", "Enregistré par", "Traité par",
+        "Visiteur", "N° pièce", "Filiale visitée", "Personne visitée", "Motif",
+        "Arrivée", "Départ", "Statut", "Enregistré par", "Traité par",
     ]
     donnees = [entetes]
     for v in visites:
@@ -84,6 +84,8 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
         donnees.append([
             Paragraph(f"{v.prenom} {v.nom}", style_cellule),
             v.numero_piece,
+            Paragraph(v.filiale.nom, style_cellule),
+            Paragraph(v.personne_visitee.nom_complet if v.personne_visitee else "—", style_cellule),
             Paragraph(v.motif, style_cellule),
             timezone.localtime(v.heure_arrivee).strftime("%d/%m/%Y %H:%M"),
             timezone.localtime(v.heure_depart).strftime("%d/%m/%Y %H:%M") if v.heure_depart else "—",
@@ -94,7 +96,10 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
 
     tableau = Table(
         donnees, repeatRows=1,
-        colWidths=[3.6 * cm, 2.2 * cm, 4.4 * cm, 2.8 * cm, 2.8 * cm, 3.2 * cm, 3.4 * cm, 3.4 * cm],
+        colWidths=[
+            2.9 * cm, 1.9 * cm, 2.5 * cm, 2.7 * cm, 3.2 * cm,
+            2.5 * cm, 2.5 * cm, 2.3 * cm, 2.7 * cm, 2.7 * cm,
+        ],
     )
     tableau.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), _COULEUR_ENTETE),

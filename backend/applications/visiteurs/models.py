@@ -46,9 +46,21 @@ class Visite(models.Model):
 
     filiale = models.ForeignKey(
         "filiales.Filiale",
-        verbose_name="Filiale",
+        verbose_name="Filiale visitée",
+        help_text="OSEOR étant un groupe, l'accueil peut recevoir des visiteurs pour n'importe laquelle de ses filiales.",
         on_delete=models.PROTECT,
         related_name="visites",
+    )
+
+    personne_visitee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Personne visitée",
+        on_delete=models.PROTECT,
+        related_name="visites_recues",
+        # Nullable côté base par sécurité de migration uniquement (données
+        # déjà en place) ; le champ est rendu obligatoire dans le serializer.
+        null=True,
+        blank=True,
     )
 
     enregistre_par = models.ForeignKey(
