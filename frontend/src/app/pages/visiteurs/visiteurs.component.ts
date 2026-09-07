@@ -139,7 +139,7 @@ export class VisiteursComponent implements OnInit {
     this.chargement.set(true);
     this.api.visites({ page_size: 100 }).subscribe({
       next: (p) => { this.chargement.set(false); this.visites.set(p.results); },
-      error: () => { this.chargement.set(false); this.erreur.set('Impossible de charger le registre des visiteurs.'); },
+      error: (err) => { this.chargement.set(false); this.erreur.set(this.extraireErreur(err, 'Impossible de charger le registre des visiteurs.')); },
     });
   }
 
@@ -157,11 +157,25 @@ export class VisiteursComponent implements OnInit {
         this.visites.update((liste) => [v, ...liste]);
         this.form = { nom: '', prenom: '', numero_piece: '' };
       },
-      error: () => {
+      error: (err) => {
         this.enregistrementEnCours.set(false);
-        this.erreur.set("Impossible d'enregistrer cette arrivée.");
+        this.erreur.set(this.extraireErreur(err, "Impossible d'enregistrer cette arrivée."));
       },
     });
+  }
+
+  /** Remonte le vrai message renvoyé par l'API (DRF : chaîne, liste, `detail`, ou erreurs de champ) plutôt qu'un message générique. */
+  private extraireErreur(err: any, repli: string): string {
+    const corps = err?.error;
+    if (typeof corps === 'string' && corps) return corps;
+    if (Array.isArray(corps) && corps.length) return String(corps[0]);
+    if (corps && typeof corps === 'object') {
+      if (corps.detail) return String(corps.detail);
+      const premiereCle = Object.keys(corps)[0];
+      const valeur = premiereCle ? corps[premiereCle] : null;
+      if (Array.isArray(valeur) && valeur.length) return String(valeur[0]);
+    }
+    return repli;
   }
 
   depart(v: Visite): void {
@@ -171,9 +185,9 @@ export class VisiteursComponent implements OnInit {
         this.departEnCours.set(null);
         this.visites.update((liste) => liste.map((x) => (x.id === maj.id ? maj : x)));
       },
-      error: () => {
+      error: (err) => {
         this.departEnCours.set(null);
-        this.erreur.set("Impossible d'enregistrer ce départ.");
+        this.erreur.set(this.extraireErreur(err, "Impossible d'enregistrer ce départ."));
       },
     });
   }

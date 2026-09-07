@@ -136,6 +136,9 @@ interface ResultatSync {
       @if (form.role === 'SECRETAIRE' && !form.filiale) {
         <div class="alerte err">RG-05 : une secrétaire sans filiale restera inactive.</div>
       }
+      @if (form.role === 'AGENT_SECURITE' && !form.filiale) {
+        <div class="alerte err">Un agent de sécurité sans filiale ne pourra pas enregistrer de visiteurs.</div>
+      }
       @if (erreur()) { <div class="alerte err">{{ erreur() }}</div> }
       <div class="boutons">
         <button class="btn vert" (click)="enregistrer()">Enregistrer</button>
