@@ -18,6 +18,10 @@ import { Visite } from '../../core/models';
       <h1>Visiteurs</h1>
       <p class="sous-titre">Registre d'accueil — enregistrement, validation par le secrétariat et suivi des départs</p>
     </div>
+    <button class="btn cta" (click)="telechargerRegistre()" [disabled]="exportEnCours()">
+      @if (exportEnCours()) { <span class="spinner petit"></span> Export… }
+      @else { <app-icon name="doc"/> Télécharger le registre }
+    </button>
   </div>
 
   @if (peutEnregistrer()) {
@@ -170,6 +174,7 @@ export class VisiteursComponent implements OnInit {
   enregistrementEnCours = signal(false);
   actionEnCours = signal<number | null>(null);
   ligneSurlignee = signal<number | null>(null);
+  exportEnCours = signal(false);
 
   form = { nom: '', prenom: '', numero_piece: '', motif: '' };
 
@@ -282,6 +287,25 @@ export class VisiteursComponent implements OnInit {
         this.visites.update((liste) => liste.map((x) => (x.id === maj.id ? maj : x)));
       },
       error: (e) => { this.actionEnCours.set(null); this.erreurToast('Refus impossible', e); },
+    });
+  }
+
+  telechargerRegistre(): void {
+    this.exportEnCours.set(true);
+    this.api.telechargerRegistreVisiteurs().subscribe({
+      next: (blob) => {
+        this.exportEnCours.set(false);
+        const url = window.URL.createObjectURL(blob);
+        const lien = document.createElement('a');
+        lien.href = url;
+        lien.download = `registre_visiteurs_${new Date().toISOString().slice(0, 10)}.pdf`;
+        lien.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: (e) => {
+        this.exportEnCours.set(false);
+        this.erreurToast('Export impossible', e);
+      },
     });
   }
 

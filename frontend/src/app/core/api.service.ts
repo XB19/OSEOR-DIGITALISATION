@@ -336,4 +336,7 @@ export class ApiService {
   marquerDepartVisite(id: number): Observable<Visite> {
     return this.http.post<Visite>(`${this.api}/visites/${id}/marquer_depart/`, {});
   }
+  telechargerRegistreVisiteurs(): Observable<Blob> {
+    return this.http.get(`${this.api}/visites/registre/`, { responseType: 'blob' });
+  }
 }

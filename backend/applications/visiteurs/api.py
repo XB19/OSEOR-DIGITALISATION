@@ -1,14 +1,17 @@
+from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from config.permissions import (
     ADMINISTRATEUR, AGENT_SECURITE, DIRECTEUR, SECRETAIRE,
-    EstUnDes, restreindre_a_la_filiale,
+    EstUnDes, est_direction, restreindre_a_la_filiale,
 )
 from applications.journalisation.services import enregistrer_action
 
 from .models import Visite
+from .pdf import generer_pdf_registre_visiteurs
 from .serializers import VisiteSerializer
 from .services import marquer_depart_visite, refuser_visite, valider_visite
 
@@ -108,3 +111,23 @@ class VisiteViewSet(mixins.ListModelMixin,
             objet=visite,
         )
         return Response(VisiteSerializer(visite).data)
+
+    # ------------------------------------------------------------------
+    # Registre imprimable — même périmètre (filiale) que la consultation
+    # ------------------------------------------------------------------
+    @action(detail=False, methods=["get"])
+    def registre(self, request):
+        visites = list(
+            self.get_queryset()
+            .select_related("enregistre_par", "traite_par")
+            .order_by("-heure_arrivee")
+        )
+        filiale_nom = "Groupe (toutes filiales)" if est_direction(request.user) else (
+            request.user.filiale.nom if request.user.filiale_id else "—"
+        )
+        contenu = generer_pdf_registre_visiteurs(visites, filiale_nom)
+
+        reponse = HttpResponse(contenu, content_type="application/pdf")
+        horodatage = timezone.localdate().isoformat()
+        reponse["Content-Disposition"] = f'attachment; filename="registre_visiteurs_{horodatage}.pdf"'
+        return reponse
