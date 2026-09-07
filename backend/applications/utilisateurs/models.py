@@ -58,6 +58,11 @@ class Utilisateur(AbstractUser):
             "Employé"
         )
 
+        AGENT_SECURITE = (
+            "AGENT_SECURITE",
+            "Agent de sécurité"
+        )
+
     role = models.CharField(
         verbose_name="Rôle",
         max_length=30,

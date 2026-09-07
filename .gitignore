@@ -20,3 +20,8 @@ backend/staticfiles/
 .DS_Store
 .idea/
 .vscode/
+
+# Ancien prototype (Spring Boot + React), dépôt Git distinct : la
+# fonctionnalité visiteurs vit désormais dans applications.visiteurs /
+# pages/visiteurs, dans ce dépôt.
+/OSEOR VISITOR/

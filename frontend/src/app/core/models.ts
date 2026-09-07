@@ -1,7 +1,7 @@
 // Modèles partagés (alignés sur l'API DRF OSEOR).
 
 export type Role = 'ADMINISTRATEUR' | 'DIRECTEUR' | 'SECRETAIRE'
-  | 'CHEF_SERVICE' | 'COMPTABLE' | 'RH' | 'EMPLOYE';
+  | 'CHEF_SERVICE' | 'COMPTABLE' | 'RH' | 'EMPLOYE' | 'AGENT_SECURITE';
 
 export interface Utilisateur {
   id: number;
@@ -413,4 +413,19 @@ export interface ModuleAide {
 export interface ReponseAideChat {
   trouve: boolean;
   resultats: EntreeAide[];
+}
+
+// ---------- Visiteurs (accueil) ----------
+export interface Visite {
+  id: number;
+  nom: string;
+  prenom: string;
+  numero_piece: string;
+  filiale: number;
+  filiale_nom: string;
+  enregistre_par: number;
+  enregistre_par_nom: string;
+  heure_arrivee: string;
+  heure_depart: string | null;
+  presente: boolean;
 }

@@ -8,7 +8,7 @@ import {
   ConfigurationDocument, DocumentAdministratif, TypeDocumentAdministratif, StatutLivraison,
   StatutPaiement,
   Article, MouvementStock, Contrat, RapportAdministratif,
-  EntreeAide, ModuleAide, ReponseAideChat,
+  EntreeAide, ModuleAide, ReponseAideChat, Visite,
 } from './models';
 
 /** Service d'accès à l'API REST OSEOR. */
@@ -318,5 +318,16 @@ export class ApiService {
   }
   poserQuestionAide(question: string): Observable<ReponseAideChat> {
     return this.http.post<ReponseAideChat>(`${this.api}/aide/poser_question/`, { question });
+  }
+
+  // ---------- Visiteurs (accueil) ----------
+  visites(filtres: Record<string, any> = {}): Observable<Paginated<Visite>> {
+    return this.http.get<Paginated<Visite>>(`${this.api}/visites/`, { params: this.params(filtres) });
+  }
+  creerVisite(v: { nom: string; prenom: string; numero_piece: string }): Observable<Visite> {
+    return this.http.post<Visite>(`${this.api}/visites/`, v);
+  }
+  marquerDepartVisite(id: number): Observable<Visite> {
+    return this.http.post<Visite>(`${this.api}/visites/${id}/marquer_depart/`, {});
   }
 }

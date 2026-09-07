@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
 
     'applications.aide',
+    'applications.visiteurs',
     'applications.caisse',
     'applications.discipline',
     'applications.validation',

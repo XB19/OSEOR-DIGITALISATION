@@ -26,6 +26,7 @@ CHEF_SERVICE = "CHEF_SERVICE"
 COMPTABLE = "COMPTABLE"
 RH = "RH"
 EMPLOYE = "EMPLOYE"
+AGENT_SECURITE = "AGENT_SECURITE"
 
 #: Voient l'ensemble du groupe et peuvent viser n'importe quelle étape.
 DIRECTION = (ADMINISTRATEUR, DIRECTEUR)

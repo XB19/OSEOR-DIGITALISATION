@@ -31,6 +31,7 @@ from applications.prestations.api import (
 )
 from applications.notes.api import NoteRecueViewSet
 from applications.aide.api import EntreeAideViewSet
+from applications.visiteurs.api import VisiteViewSet
 
 router = DefaultRouter()
 router.register("utilisateurs", UtilisateurViewSet, basename="utilisateur")
@@ -60,6 +61,7 @@ router.register("prestations", PrestationViewSet, basename="prestation")
 router.register("jalons", JalonPrestationViewSet, basename="jalon")
 router.register("notes-recues", NoteRecueViewSet, basename="note-recue")
 router.register("aide", EntreeAideViewSet, basename="entree-aide")
+router.register("visites", VisiteViewSet, basename="visite")
 
 urlpatterns = [
     # Authentification JWT (dev)

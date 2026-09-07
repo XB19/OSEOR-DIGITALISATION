@@ -146,6 +146,12 @@ export const routes: Routes = [
           import('./pages/prestations/prestations.component').then((m) => m.PrestationsComponent),
       },
       {
+        path: 'visiteurs',
+        canActivate: [roleGuard('AGENT_SECURITE', 'SECRETAIRE', 'DIRECTEUR', 'ADMINISTRATEUR')],
+        loadComponent: () =>
+          import('./pages/visiteurs/visiteurs.component').then((m) => m.VisiteursComponent),
+      },
+      {
         // Sans garde de rôle : un salarié convoqué suit le lien de sa
         // notification et ne voit que son propre dossier (le service ne
         // lui en renvoie pas d'autre). L'entrée de menu, elle, reste

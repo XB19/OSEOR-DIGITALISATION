@@ -15,6 +15,10 @@ export interface ModuleMetier {
 }
 
 export const MODULES_MOYENS_GENERAUX: ModuleMetier[] = [
+  {
+    lien: '/visiteurs', libelle: 'Visiteurs', icone: 'idCard',
+    roles: ['AGENT_SECURITE', 'SECRETAIRE', 'DIRECTEUR', 'ADMINISTRATEUR'],
+  },
   { lien: '/fiche-besoin', libelle: 'Fiche de besoin', icone: 'send' },
   { lien: '/demandes-achat', libelle: "Demandes d'achat", icone: 'cart' },
   {
