@@ -7,7 +7,7 @@ import { AuthService } from '../../core/auth.service';
 import { DialogueService } from '../../core/dialogue.service';
 import { ToastService } from '../../core/toast.service';
 import { IconComponent } from '../../shared/icon.component';
-import { Visite, Filiale, Utilisateur } from '../../core/models';
+import { Visite, Filiale, Utilisateur, TypePiece } from '../../core/models';
 
 @Component({
   selector: 'app-visiteurs',
@@ -38,11 +38,22 @@ import { Visite, Filiale, Utilisateur } from '../../core/models';
             <label>Prénom</label>
             <input type="text" [(ngModel)]="form.prenom" name="prenom" required autocomplete="off" />
           </div>
+        </div>
+        <div class="ligne">
           <div class="champ">
-            <label>Numéro de pièce d'identité</label>
-            <input type="text" inputmode="numeric" pattern="[0-9]*"
+            <label>Type de pièce</label>
+            <select [ngModel]="form.type_piece" (ngModelChange)="changerTypePiece($event)" name="type_piece" required>
+              <option value="CNI">Carte nationale d'identité</option>
+              <option value="PASSEPORT">Passeport</option>
+            </select>
+          </div>
+          <div class="champ">
+            <label>Numéro {{ form.type_piece === 'PASSEPORT' ? 'de passeport' : 'de CNI' }}</label>
+            <input type="text" [attr.inputmode]="form.type_piece === 'CNI' ? 'numeric' : null"
                    [ngModel]="form.numero_piece" (ngModelChange)="fixerNumeroPiece($event)"
-                   name="numero_piece" placeholder="Chiffres uniquement" required autocomplete="off" />
+                   name="numero_piece"
+                   [placeholder]="form.type_piece === 'PASSEPORT' ? 'Lettres et chiffres' : 'Chiffres uniquement'"
+                   required autocomplete="off" />
           </div>
         </div>
         <div class="ligne">
@@ -82,7 +93,7 @@ import { Visite, Filiale, Utilisateur } from '../../core/models';
     } @else {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>N° pièce</th><th>Enregistré par</th><th>Heure</th>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>Pièce d'identité</th><th>Enregistré par</th><th>Heure</th>
             @if (peutTraiter()) { <th></th> }</tr>
         </thead>
         <tbody class="stagger">
@@ -92,7 +103,7 @@ import { Visite, Filiale, Utilisateur } from '../../core/models';
               <td>{{ v.filiale_nom }}</td>
               <td>{{ v.personne_visitee_nom }}</td>
               <td>{{ v.motif }}</td>
-              <td>{{ v.numero_piece }}</td>
+              <td>{{ v.type_piece_libelle }} — {{ v.numero_piece }}</td>
               <td>{{ v.enregistre_par_nom }}</td>
               <td>{{ v.heure_arrivee | date:'HH:mm' }}</td>
               @if (peutTraiter()) {
@@ -121,7 +132,7 @@ import { Visite, Filiale, Utilisateur } from '../../core/models';
     } @else if (!chargement()) {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>N° pièce</th><th>Validé par</th><th>Heure d'arrivée</th><th></th></tr>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>Pièce d'identité</th><th>Validé par</th><th>Heure d'arrivée</th><th></th></tr>
         </thead>
         <tbody class="stagger">
           @for (v of presents(); track v.id) {
@@ -130,7 +141,7 @@ import { Visite, Filiale, Utilisateur } from '../../core/models';
               <td>{{ v.filiale_nom }}</td>
               <td>{{ v.personne_visitee_nom }}</td>
               <td>{{ v.motif }}</td>
-              <td>{{ v.numero_piece }}</td>
+              <td>{{ v.type_piece_libelle }} — {{ v.numero_piece }}</td>
               <td>{{ v.traite_par_nom }}</td>
               <td>{{ v.heure_arrivee | date:'HH:mm' }}</td>
               <td>
@@ -201,8 +212,11 @@ export class VisiteursComponent implements OnInit {
   personnes = signal<Utilisateur[]>([]);
   chargementPersonnes = signal(false);
 
-  form: { nom: string; prenom: string; numero_piece: string; motif: string; filiale: number | null; personne_visitee: number | null } = {
-    nom: '', prenom: '', numero_piece: '', motif: '', filiale: null, personne_visitee: null,
+  form: {
+    nom: string; prenom: string; type_piece: TypePiece; numero_piece: string; motif: string;
+    filiale: number | null; personne_visitee: number | null;
+  } = {
+    nom: '', prenom: '', type_piece: 'CNI', numero_piece: '', motif: '', filiale: null, personne_visitee: null,
   };
 
   constructor(
@@ -254,9 +268,21 @@ export class VisiteursComponent implements OnInit {
     );
   }
 
-  /** Ne garde que les chiffres saisis (numéro de pièce d'identité). */
+  /** Change de type de pièce : réapplique le filtre au numéro déjà saisi, au cas où il ne conviendrait plus. */
+  changerTypePiece(type: TypePiece): void {
+    this.form.type_piece = type;
+    this.fixerNumeroPiece(this.form.numero_piece);
+  }
+
+  /**
+   * Filtre la saisie selon le type de pièce : une CNI est numérique, un
+   * passeport mélange lettres et chiffres (format ICAO) — mis en
+   * majuscules par convention.
+   */
   fixerNumeroPiece(valeur: string): void {
-    this.form.numero_piece = valeur.replace(/\D/g, '');
+    this.form.numero_piece = this.form.type_piece === 'PASSEPORT'
+      ? valeur.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+      : valeur.replace(/\D/g, '');
   }
 
   enAttente() {
@@ -289,6 +315,7 @@ export class VisiteursComponent implements OnInit {
     this.api.creerVisite({
       nom: this.form.nom.trim(),
       prenom: this.form.prenom.trim(),
+      type_piece: this.form.type_piece,
       numero_piece: this.form.numero_piece.trim(),
       motif: this.form.motif.trim(),
       filiale: this.form.filiale!,
@@ -297,7 +324,7 @@ export class VisiteursComponent implements OnInit {
       next: (v) => {
         this.enregistrementEnCours.set(false);
         this.visites.update((liste) => [v, ...liste]);
-        this.form = { nom: '', prenom: '', numero_piece: '', motif: '', filiale: null, personne_visitee: null };
+        this.form = { nom: '', prenom: '', type_piece: 'CNI', numero_piece: '', motif: '', filiale: null, personne_visitee: null };
         this.personnes.set([]);
         this.toasts.succes('Demande envoyée au secrétariat pour validation.');
       },

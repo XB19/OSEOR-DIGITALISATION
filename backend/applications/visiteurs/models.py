@@ -2,9 +2,16 @@ from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 
-_VALIDATEUR_NUMERO_PIECE = RegexValidator(
-    r"^\d+$", "Le numéro de pièce d'identité ne doit contenir que des chiffres."
-)
+# Format attendu du numéro selon le type de pièce : une CNI est numérique,
+# un passeport mélange lettres et chiffres (format ICAO) — la validation
+# ne peut donc pas être un seul motif fixe, elle dépend du type choisi
+# (voir VisiteSerializer.validate).
+_VALIDATEURS_NUMERO_PAR_TYPE = {
+    "CNI": RegexValidator(r"^\d+$", "Le numéro de CNI ne doit contenir que des chiffres."),
+    "PASSEPORT": RegexValidator(
+        r"^[A-Za-z0-9]+$", "Le numéro de passeport ne doit contenir que des lettres et des chiffres."
+    ),
+}
 
 
 class Visite(models.Model):
@@ -22,6 +29,10 @@ class Visite(models.Model):
         REFUSEE = "REFUSEE", "Refusée"
         TERMINEE = "TERMINEE", "Terminée"
 
+    class TypePiece(models.TextChoices):
+        CNI = "CNI", "Carte nationale d'identité"
+        PASSEPORT = "PASSEPORT", "Passeport"
+
     nom = models.CharField(
         verbose_name="Nom",
         max_length=100,
@@ -32,10 +43,18 @@ class Visite(models.Model):
         max_length=100,
     )
 
+    type_piece = models.CharField(
+        verbose_name="Type de pièce",
+        max_length=20,
+        choices=TypePiece.choices,
+        default=TypePiece.CNI,
+    )
+
     numero_piece = models.CharField(
+        # Pas de `validators=` fixe ici : le format dépend de `type_piece`,
+        # vérifié dans VisiteSerializer.validate (voir _VALIDATEURS_NUMERO_PAR_TYPE).
         verbose_name="Numéro de pièce d'identité",
         max_length=30,
-        validators=[_VALIDATEUR_NUMERO_PIECE],
     )
 
     motif = models.CharField(

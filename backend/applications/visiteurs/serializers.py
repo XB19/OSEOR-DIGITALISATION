@@ -1,6 +1,7 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Visite, _VALIDATEUR_NUMERO_PIECE
+from .models import Visite, _VALIDATEURS_NUMERO_PAR_TYPE
 
 
 class VisiteSerializer(serializers.ModelSerializer):
@@ -8,8 +9,12 @@ class VisiteSerializer(serializers.ModelSerializer):
     # (nécessaire côté modèle uniquement pour ne pas bloquer une future
     # migration). Ces attributs ne sont pas hérités automatiquement dès
     # qu'un champ est redéclaré explicitement : on les reprend donc ici.
-    numero_piece = serializers.CharField(max_length=30, validators=[_VALIDATEUR_NUMERO_PIECE])
+    # `numero_piece` n'a pas de validateur fixe : son format dépend de
+    # `type_piece`, vérifié dans `validate()` ci-dessous (une CNI est
+    # numérique, un passeport mélange lettres et chiffres).
+    numero_piece = serializers.CharField(max_length=30)
     motif = serializers.CharField(max_length=255)
+    type_piece_libelle = serializers.CharField(source="get_type_piece_display", read_only=True)
     # OSEOR est un groupe : la filiale visitée n'est pas forcément celle de
     # l'agent qui saisit (accueil commun à plusieurs filiales) — c'est lui
     # qui la précise, pour chaque visiteur.
@@ -30,6 +35,8 @@ class VisiteSerializer(serializers.ModelSerializer):
             "id",
             "nom",
             "prenom",
+            "type_piece",
+            "type_piece_libelle",
             "numero_piece",
             "motif",
             "filiale",
@@ -58,6 +65,16 @@ class VisiteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"personne_visitee": "Cette personne n'appartient pas à la filiale sélectionnée."}
             )
+
+        type_piece = attrs.get("type_piece") or Visite.TypePiece.CNI
+        numero_piece = attrs.get("numero_piece")
+        validateur = _VALIDATEURS_NUMERO_PAR_TYPE.get(type_piece)
+        if numero_piece and validateur:
+            try:
+                validateur(numero_piece)
+            except DjangoValidationError as erreur:
+                raise serializers.ValidationError({"numero_piece": erreur.messages})
+
         return attrs
 
     def create(self, validated_data):

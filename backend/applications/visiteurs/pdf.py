@@ -72,7 +72,7 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
     ]
 
     entetes = [
-        "Visiteur", "N° pièce", "Filiale visitée", "Personne visitée", "Motif",
+        "Visiteur", "Pièce d'identité", "Filiale visitée", "Personne visitée", "Motif",
         "Arrivée", "Départ", "Statut", "Enregistré par", "Traité par",
     ]
     donnees = [entetes]
@@ -83,7 +83,7 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
             style_ce_statut = ParagraphStyle(f"Statut{v.pk}", parent=style_statut, textColor=couleur)
         donnees.append([
             Paragraph(f"{v.prenom} {v.nom}", style_cellule),
-            v.numero_piece,
+            Paragraph(f"{v.get_type_piece_display()}<br/>{v.numero_piece}", style_cellule),
             Paragraph(v.filiale.nom, style_cellule),
             Paragraph(v.personne_visitee.nom_complet if v.personne_visitee else "—", style_cellule),
             Paragraph(v.motif, style_cellule),
@@ -97,8 +97,8 @@ def generer_pdf_registre_visiteurs(visites, filiale_nom: str) -> bytes:
     tableau = Table(
         donnees, repeatRows=1,
         colWidths=[
-            2.9 * cm, 1.9 * cm, 2.5 * cm, 2.7 * cm, 3.2 * cm,
-            2.5 * cm, 2.5 * cm, 2.3 * cm, 2.7 * cm, 2.7 * cm,
+            2.9 * cm, 2.4 * cm, 2.5 * cm, 2.7 * cm, 2.9 * cm,
+            2.5 * cm, 2.5 * cm, 2.3 * cm, 2.6 * cm, 2.6 * cm,
         ],
     )
     tableau.setStyle(TableStyle([

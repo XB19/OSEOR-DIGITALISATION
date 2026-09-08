@@ -417,11 +417,14 @@ export interface ReponseAideChat {
 
 // ---------- Visiteurs (accueil) ----------
 export type StatutVisite = 'EN_ATTENTE' | 'VALIDEE' | 'REFUSEE' | 'TERMINEE';
+export type TypePiece = 'CNI' | 'PASSEPORT';
 
 export interface Visite {
   id: number;
   nom: string;
   prenom: string;
+  type_piece: TypePiece;
+  type_piece_libelle: string;
   numero_piece: string;
   motif: string;
   filiale: number;
