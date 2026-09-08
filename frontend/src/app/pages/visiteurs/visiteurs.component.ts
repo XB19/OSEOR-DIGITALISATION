@@ -132,7 +132,8 @@ import { Visite, Filiale, Utilisateur, TypePiece } from '../../core/models';
     } @else if (!chargement()) {
       <table class="tbl">
         <thead>
-          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>Pièce d'identité</th><th>Validé par</th><th>Heure d'arrivée</th><th></th></tr>
+          <tr><th>Visiteur</th><th>Filiale</th><th>Personne visitée</th><th>Motif</th><th>Pièce d'identité</th><th>Validé par</th><th>Heure d'arrivée</th>
+            @if (peutMarquerDepart()) { <th></th> }</tr>
         </thead>
         <tbody class="stagger">
           @for (v of presents(); track v.id) {
@@ -144,12 +145,14 @@ import { Visite, Filiale, Utilisateur, TypePiece } from '../../core/models';
               <td>{{ v.type_piece_libelle }} — {{ v.numero_piece }}</td>
               <td>{{ v.traite_par_nom }}</td>
               <td>{{ v.heure_arrivee | date:'HH:mm' }}</td>
-              <td>
-                <button class="btn secondaire petit" (click)="depart(v)" [disabled]="actionEnCours() === v.id">
-                  @if (actionEnCours() === v.id) { <span class="spinner petit"></span> }
-                  @else { <app-icon name="logout" [size]="15"/> Marquer le départ }
-                </button>
-              </td>
+              @if (peutMarquerDepart()) {
+                <td>
+                  <button class="btn secondaire petit" (click)="depart(v)" [disabled]="actionEnCours() === v.id">
+                    @if (actionEnCours() === v.id) { <span class="spinner petit"></span> }
+                    @else { <app-icon name="logout" [size]="15"/> Marquer le départ }
+                  </button>
+                </td>
+              }
             </tr>
           }
         </tbody>
@@ -254,6 +257,11 @@ export class VisiteursComponent implements OnInit {
 
   peutTraiter(): boolean {
     return this.auth.aRole('SECRETAIRE', 'ADMINISTRATEUR', 'DIRECTEUR');
+  }
+
+  /** Rendre la pièce d'identité et clore la visite : le rôle de l'agent, jamais celui de la secrétaire. */
+  peutMarquerDepart(): boolean {
+    return this.auth.aRole('AGENT_SECURITE', 'ADMINISTRATEUR', 'DIRECTEUR');
   }
 
   /** La secrétaire ne fait que valider/refuser : le formulaire d'arrivée ne la concerne pas. */

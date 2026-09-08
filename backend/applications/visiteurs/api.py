@@ -114,11 +114,20 @@ class VisiteViewSet(mixins.ListModelMixin,
         return Response(VisiteSerializer(visite).data)
 
     # ------------------------------------------------------------------
-    # Départ : l'agent de sécurité rend la pièce d'identité au visiteur
+    # Départ : l'agent de sécurité rend la pièce d'identité au visiteur —
+    # jamais la secrétaire, qui ne fait que valider/refuser la demande.
     # ------------------------------------------------------------------
+    def _peut_marquer_depart(self, request) -> bool:
+        return request.user.role in (AGENT_SECURITE, ADMINISTRATEUR, DIRECTEUR)
+
     @action(detail=True, methods=["post"])
     def marquer_depart(self, request, pk=None):
         visite = self.get_object()
+        if not self._peut_marquer_depart(request):
+            return Response(
+                {"detail": "Seul l'agent de sécurité peut marquer le départ d'un visiteur."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if visite.statut != Visite.Statut.VALIDEE:
             return Response(
                 {"detail": "Seul un visiteur validé et toujours présent peut être marqué comme parti."},
