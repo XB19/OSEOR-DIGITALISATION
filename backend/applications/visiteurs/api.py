@@ -10,7 +10,7 @@ from config.permissions import (
 )
 from applications.journalisation.services import enregistrer_action
 
-from .models import Visite
+from .models import CODE_FILIALE_ACCUEIL, Visite
 from .pdf import generer_pdf_registre_visiteurs
 from .serializers import VisiteSerializer
 from .services import marquer_depart_visite, refuser_visite, valider_visite
@@ -33,20 +33,27 @@ class VisiteViewSet(mixins.ListModelMixin,
     filterset_fields = ("statut",)
     ordering_fields = ("heure_arrivee",)
 
+    def _est_secretaire_accueil(self, u) -> bool:
+        """
+        L'accueil est commun à tout le groupe (une seule réception physique) :
+        seule la secrétaire de la filiale OSEOR (le siège) y a un rôle,
+        jamais celle de la filiale visitée — qui peut être différente.
+        """
+        return u.role == SECRETAIRE and bool(u.filiale_id) and u.filiale.code == CODE_FILIALE_ACCUEIL
+
+    def _voit_tout_le_groupe(self, u) -> bool:
+        return est_direction(u) or u.role == AGENT_SECURITE or self._est_secretaire_accueil(u)
+
     def get_queryset(self):
         """
-        L'agent de sécurité tient un accueil commun à tout le groupe : il
-        voit les visites de toutes les filiales, pas seulement la sienne
-        (`restreindre_a_la_filiale` ne convient pas ici). La secrétaire, en
-        revanche, ne s'occupe que des visiteurs de sa propre filiale.
+        L'agent de sécurité et la secrétaire de l'accueil voient les
+        visites de toutes les filiales (accueil commun au groupe) ; les
+        autres secrétaires n'ont aucun rôle dans ce circuit.
         """
-        u = self.request.user
         qs = Visite.objects.select_related(
             "filiale", "personne_visitee", "enregistre_par", "traite_par"
         )
-        if est_direction(u) or u.role == AGENT_SECURITE:
-            return qs
-        return qs.filter(filiale_id=u.filiale_id) if u.filiale_id else qs.none()
+        return qs if self._voit_tout_le_groupe(self.request.user) else qs.none()
 
     def perform_create(self, serializer):
         visite = serializer.save()
@@ -60,7 +67,8 @@ class VisiteViewSet(mixins.ListModelMixin,
     # Validation par le secrétariat (même logique que RG-02 côté réservations)
     # ------------------------------------------------------------------
     def _peut_traiter(self, request) -> bool:
-        return request.user.role in (SECRETAIRE, ADMINISTRATEUR, DIRECTEUR)
+        u = request.user
+        return u.role in (ADMINISTRATEUR, DIRECTEUR) or self._est_secretaire_accueil(u)
 
     @action(detail=True, methods=["post"])
     def valider(self, request, pk=None):
@@ -131,7 +139,7 @@ class VisiteViewSet(mixins.ListModelMixin,
     def registre(self, request):
         visites = list(self.get_queryset().order_by("-heure_arrivee"))
         u = request.user
-        filiale_nom = "Groupe (toutes filiales)" if (est_direction(u) or u.role == AGENT_SECURITE) else (
+        filiale_nom = "Groupe (toutes filiales)" if self._voit_tout_le_groupe(u) else (
             u.filiale.nom if u.filiale_id else "—"
         )
         contenu = generer_pdf_registre_visiteurs(visites, filiale_nom)

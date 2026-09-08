@@ -13,6 +13,12 @@ _VALIDATEURS_NUMERO_PAR_TYPE = {
     ),
 }
 
+# L'accueil est commun à tout le groupe (une seule réception physique) :
+# quelle que soit la filiale visitée, c'est toujours la secrétaire de
+# cette filiale-ci (le siège) qui valide, jamais celle de la filiale
+# visitée — plus l'administrateur, en secours/supervision.
+CODE_FILIALE_ACCUEIL = "OSEOR"
+
 
 class Visite(models.Model):
     """

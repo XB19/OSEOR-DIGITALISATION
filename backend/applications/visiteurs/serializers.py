@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Visite, _VALIDATEURS_NUMERO_PAR_TYPE
+from .models import CODE_FILIALE_ACCUEIL, Visite, _VALIDATEURS_NUMERO_PAR_TYPE
 
 
 class VisiteSerializer(serializers.ModelSerializer):
@@ -83,25 +83,28 @@ class VisiteSerializer(serializers.ModelSerializer):
         validated_data["enregistre_par"] = utilisateur
 
         visite = Visite.objects.create(**validated_data)
-        self._notifier_secretariat(visite)
+        self._notifier_accueil(visite)
         self._notifier_personne_visitee(visite)
         return visite
 
-    def _notifier_secretariat(self, visite):
-        """Signale la nouvelle demande aux secrétaires de la filiale visitée, même schéma que RG-02 côté réservations."""
+    def _notifier_accueil(self, visite):
+        """
+        Signale la nouvelle demande à qui doit la traiter : la secrétaire de
+        l'accueil (toujours celle de la filiale OSEOR — le siège, pas celle
+        de la filiale visitée, l'accueil étant commun à tout le groupe) et
+        l'administrateur, en secours/supervision. Même schéma que RG-02
+        côté réservations.
+        """
         from django.contrib.auth import get_user_model
         from applications.notifications.services import envoyer_notification
 
         User = get_user_model()
-        secretaires = User.objects.filter(filiale=visite.filiale_id, role=User.Role.SECRETAIRE)
-        for secretaire in secretaires:
-            envoyer_notification(
-                secretaire,
-                "Visiteur à l'accueil",
-                f"{visite.prenom} {visite.nom} pour {visite.personne_visitee.nom_complet} — {visite.motif}",
-                "INFO",
-                objet=visite,
-            )
+        message = f"{visite.prenom} {visite.nom} pour {visite.personne_visitee.nom_complet} — {visite.motif}"
+        destinataires = User.objects.filter(
+            role=User.Role.SECRETAIRE, filiale__code=CODE_FILIALE_ACCUEIL,
+        ) | User.objects.filter(role=User.Role.ADMINISTRATEUR)
+        for destinataire in destinataires.distinct():
+            envoyer_notification(destinataire, "Visiteur à l'accueil", message, "INFO", objet=visite)
 
     def _notifier_personne_visitee(self, visite):
         """La personne visitée est prévenue tout de suite, avant même la validation du secrétariat."""
